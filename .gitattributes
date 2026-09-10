@@ -1,0 +1,15 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.bat text eol=crlf
+
+# dev-internal files, excluded from the public release snapshot (git archive)
+/AGENTS.md export-ignore
+/docs/roadmap.md export-ignore
+/docs/strategy.md export-ignore
+/opencode.json export-ignore
+/.opencode/ export-ignore
+/scripts/publish.sh export-ignore

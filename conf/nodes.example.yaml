@@ -1,0 +1,21 @@
+# Caravan environments — copy to `nodes.yaml` and edit (or add via the hub UI).
+# Domain/email live in caravan.env; a node `name` is served at `<name>.<DOMAIN>`.
+#   name     -> canonical slug (DNS-safe)
+#   aliases  -> extra subdomains to the same backend
+#   location -> free-text label you set by hand (used for grouping on the portal)
+#   tags     -> free-text labels
+envs:
+  - name: web1
+    ip: 100.64.0.10
+    port: 9898
+    label: "Web server"
+    location: "My server · Hetzner"
+    tags: [dev]
+    aliases: [w1]
+
+  - name: work
+    ip: 100.64.0.11
+    port: 9898
+    label: "Work workstation"
+    location: "Office"
+    tags: [work]

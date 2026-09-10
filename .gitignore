@@ -1,0 +1,45 @@
+# --- secrets: never commit ---
+.env
+**/.env
+!**/.env.example
+secrets.env
+**/secrets.env
+
+# local leak-scan patterns (real infra values) — never commit
+.leak-patterns
+
+# local hub config (non-secret, but environment-specific); commit only the example
+caravan.env
+!caravan.env.example
+
+# local environment manifest (real nodes); commit only the example
+conf/nodes.yaml
+!conf/nodes.example.yaml
+
+# runtime config with credentials (Authelia jwt/session/encryption, users hashes)
+authelia/configuration.yml
+authelia/users_database.yml
+conf/authelia-config.yml
+conf/users_database.yml
+
+# generated at deploy time (from generate_caddy.py); regenerate, don't commit
+conf/nodes.json
+compose/caddy/Caddyfile
+/caddy/
+/nodes.json
+
+# backups
+*.tar.gz
+backups/
+
+# runtime / logs
+*.log
+noise_private.key
+.noise_private.key
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.pyc

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for CodeNomad hub environment change requests
+After=network-online.target
+
+[Path]
+DirectoryNotEmpty=/opt/hub/requests
+
+[Install]
+WantedBy=multi-user.target

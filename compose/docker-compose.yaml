@@ -1,0 +1,70 @@
+services:
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - hub
+
+  headscale:
+    image: headscale/headscale:0.29.3
+    container_name: headscale
+    restart: unless-stopped
+    command: serve
+    volumes:
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - headscale-data:/var/lib/headscale
+    networks:
+      - hub
+    depends_on:
+      - caddy
+
+  authelia:
+    image: authelia/authelia:4.39.20
+    container_name: authelia
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./authelia:/config
+    networks:
+      - hub
+    depends_on:
+      - caddy
+
+  portal:
+    image: python:3.12-slim
+    container_name: portal
+    restart: unless-stopped
+    working_dir: /app
+    command: python /app/status.py
+    environment:
+      NODES_JSON: /data/nodes.json
+      REQUESTS_DIR: /data/requests
+      PORTAL_REFRESH: "10"
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      TELEGRAM_CHAT: ${TELEGRAM_CHAT}
+    volumes:
+      - ./status.py:/app/status.py:ro
+      - ./nodes.json:/data/nodes.json:ro
+      - ./requests:/data/requests
+    networks:
+      - hub
+    depends_on:
+      - caddy
+
+volumes:
+  headscale-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  hub:
+    driver: bridge

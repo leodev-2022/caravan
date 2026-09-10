@@ -1,0 +1,9 @@
+# users database (file backend) — rendered by install.sh into
+# authelia/users_database.yml. The file backend stores ONLY the password;
+# TOTP is registered by the user through the Authelia portal (stored in its DB).
+users:
+  __ADMIN_USER__:
+    displayname: "__ADMIN_USER__"
+    email: "__ADMIN_EMAIL__"
+    password: "__ADMIN_PASSWORD_HASH__"
+    groups: []

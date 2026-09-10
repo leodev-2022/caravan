@@ -1,0 +1,8 @@
+[Unit]
+Description=Apply CodeNomad hub environment change requests
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/hub/tools/apply_request.py
