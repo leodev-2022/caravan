@@ -12,6 +12,22 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Self-bootstrap: when run via `curl ... | sudo bash`, the repo files are not
+# next to us — fetch the repo and re-exec from there.
+if [ ! -f "$HERE/scripts/lib.sh" ]; then
+  _tarball="${CARAVAN_TARBALL:-https://github.com/leodev-2022/caravan/archive/refs/heads/main.tar.gz}"
+  _tmp="$(mktemp -d)"
+  echo "[caravan] fetching $_tarball"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$_tarball" | tar xz -C "$_tmp"
+  else
+    wget -qO- "$_tarball" | tar xz -C "$_tmp"
+  fi
+  _script="$(ls -d "$_tmp"/caravan-*/install.sh | head -n1)"
+  exec bash "$_script" "$@"
+fi
+
 # shellcheck source=scripts/lib.sh
 . "$HERE/scripts/lib.sh"
 
@@ -29,6 +45,7 @@ Usage: sudo bash install.sh [--domain NAME | --sslip | --self-signed]
   --sslip         use <public-ip>.sslip.io (ACME; no domain needed)
   --self-signed   Caddy internal CA (no public DNS/ports; browser warning)
   --update        pull latest images and re-apply (keeps secrets/config/DB)
+  --dry-run       resolve the domain/TLS and print the plan, then exit
 EOF
 }
 
@@ -37,6 +54,7 @@ DOMAIN_FLAG=""
 SSLIP=0
 SELF_SIGNED=0
 UPDATE=0
+DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain)
@@ -54,6 +72,10 @@ while [ $# -gt 0 ]; do
       ;;
     --update)
       UPDATE=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
       shift
       ;;
     -h | --help)
@@ -94,18 +116,18 @@ load_config() {
 
 resolve_tls() {
   local ip=""
-  if [ "$SSLIP" = 1 ] || { [ "$TLS_MODE" = internal ] && [ -z "$DOMAIN" ]; }; then
+  # zero questions: if no domain was given, fall back to <public-ip>.sslip.io
+  if [ "$SSLIP" = 1 ] || [ -z "$DOMAIN" ]; then
     ip="${HUB_IP:-}"
     if [ -z "$ip" ]; then
       ip="$(curl -fsS --max-time 8 https://api.ipify.org 2>/dev/null ||
         curl -fsS --max-time 8 https://ifconfig.me 2>/dev/null || true)"
     fi
-    [ -n "$ip" ] || die "cannot determine public IP (set HUB_IP in caravan.env)"
+    [ -n "$ip" ] || die "cannot determine public IP — set HUB_IP in caravan.env or pass --domain"
     DOMAIN="$(printf '%s' "$ip" | tr '.' '-').sslip.io"
     SSLIP=1
-    log "sslip.io domain: $DOMAIN"
+    log "no domain given — using sslip.io: $DOMAIN"
   fi
-  [ -n "$DOMAIN" ] || die "no domain: pass --domain NAME, --sslip or --self-signed"
   [ -n "$EMAIL" ] || EMAIL="admin@${DOMAIN}"
   TLS_MODE="${TLS_MODE:-acme}"
   export DOMAIN EMAIL HUB_IP TZ TLS_MODE
@@ -287,6 +309,10 @@ main() {
   [ -n "$DOMAIN_FLAG" ] && DOMAIN="$DOMAIN_FLAG"
   [ "$SELF_SIGNED" = 1 ] && TLS_MODE="internal"
   resolve_tls
+  if [ "$DRY_RUN" = 1 ]; then
+    log "dry-run: dir=$CARAVAN_DIR tls=$TLS_MODE domain=$DOMAIN"
+    return 0
+  fi
   install_docker
   install_secrets
   write_env

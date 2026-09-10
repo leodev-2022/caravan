@@ -54,9 +54,11 @@ Nodes: CodeNomad on :9898 (mesh-only, HTTP)   [+ optional local STT]
 ## Quick start
 ### 1. Hub (one command)
 ```bash
-sudo bash install.sh --domain example.com   # or --sslip (no domain) / --self-signed
+curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/install.sh | sudo bash
 ```
-It prints the dashboard URL and a one-time admin password.
+No domain needed — it auto-uses `<your-ip>.sslip.io` for HTTPS. With a domain:
+`… | sudo bash -s -- --domain example.com`. It prints the dashboard URL and a
+one-time admin password.
 
 ### 2. A machine (node)
 ```bash

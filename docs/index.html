@@ -125,8 +125,7 @@ footer a:hover{color:var(--ink)}
     <a class="btn ghost" href="https://github.com/leodev-2022/caravan">View on GitHub</a>
   </div>
   <div class="install">
-    <pre>git clone https://github.com/leodev-2022/caravan &amp;&amp; cd caravan
-sudo bash install.sh --domain example.com</pre>
+    <pre>curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/install.sh | sudo bash</pre>
     <button class="copy" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent);this.textContent='copied';setTimeout(()=>this.textContent='copy',900)">copy</button>
   </div>
   <p class="warnline">⚠️ <b>Early-stage (pre-1.0).</b> Test on a fresh, throwaway machine — not on a server with critical data. Back up first.</p>
@@ -170,8 +169,7 @@ sudo bash install.sh --domain example.com</pre>
   <h2>Get started in three steps</h2>
   <p class="section-lede">Bring your own server. One command each.</p>
   <div class="grid flow">
-    <div class="step"><div class="n">1</div><h3>Hub</h3><pre>sudo bash install.sh \
-  --domain example.com</pre></div>
+    <div class="step"><div class="n">1</div><h3>Hub</h3><pre>curl -fsSL .../caravan/main/install.sh | sudo bash</pre></div>
     <div class="step"><div class="n">2</div><h3>A machine</h3><pre>sudo bash tools/node-join.sh \
   --hub https://mesh.example.com \
   --token &lt;key&gt; --name web1</pre></div>
