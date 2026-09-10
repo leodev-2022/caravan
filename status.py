@@ -340,11 +340,11 @@ def render(data, statuses, ts):
     return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="{FAVICON}">
-<title>CodeNomad Hub</title><style>{CSS}</style></head><body>
+<title>Caravan</title><style>{CSS}</style></head><body>
 <div class="wrap">
   <header>
     <div class="brand">{LOGO_SVG}
-      <div><div class="name">Code<span>Nomad</span> Hub</div>
+      <div><div class="name">Cara<span>van</span></div>
       <div class="sub">{len(envs)} <span data-i18n="envs">окружений</span></div></div>
     </div>
     <div class="ctrls">

@@ -68,7 +68,10 @@ fi
 
 echo "[check] leak scan"
 if [ -f .leak-patterns ]; then
-  if git grep -nE -f .leak-patterns -- . 2>/dev/null; then
+  # dev-internal files are export-ignored from the public snapshot — skip them
+  if git grep -nE -f .leak-patterns -- . \
+    ':(exclude)AGENTS.md' ':(exclude)docs/roadmap.md' ':(exclude)docs/strategy.md' \
+    ':(exclude)opencode.json' ':(exclude).opencode' ':(exclude)scripts/publish.sh' 2>/dev/null; then
     echo "  ^ real infra value found in tracked files"; fail=1
   else
     echo "  clean"

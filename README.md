@@ -19,9 +19,10 @@ door, and a self-hosted mesh so your machines never need inbound ports.
 - **Open source** — MIT.
 
 ## Screenshots
-> Dashboard · live status · add/remove environments · SSO login.
+![Caravan dashboard](docs/img/dashboard.png)
 
-_(screenshots & demo GIF coming soon — see `docs/img/`)_
+*Live dashboard: per-machine status, locations, tags, and one-click open — all
+behind SSO.*
 
 ## How it works
 ```
