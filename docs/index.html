@@ -48,6 +48,8 @@ h1 span{color:var(--accent)}
 .install pre{margin:0;flex:1;min-width:0;text-align:left;font-family:var(--mono);font-size:13px;line-height:1.55;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
 .install .copy{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:7px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer}
 .install .copy:hover{color:var(--ink);border-color:var(--line2)}
+.warnline{color:var(--muted);font-size:13px;margin:16px auto 0;max-width:640px;text-align:center;line-height:1.5}
+.warnline b{color:var(--accent)}
 .hero-shot{margin:56px auto 0;max-width:1000px}
 .hero-shot img{width:100%;display:block;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .hero-shot figcaption{color:var(--muted);font-size:13px;margin-top:14px}
@@ -127,6 +129,7 @@ footer a:hover{color:var(--ink)}
 sudo bash install.sh --domain example.com</pre>
     <button class="copy" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent);this.textContent='copied';setTimeout(()=>this.textContent='copy',900)">copy</button>
   </div>
+  <p class="warnline">⚠️ <b>Early-stage (pre-1.0).</b> Test on a fresh, throwaway machine — not on a server with critical data. Back up first.</p>
   <figure class="hero-shot">
     <img src="img/dashboard.png" alt="Caravan dashboard">
     <figcaption>One window to every machine — live status, locations, tags, one-click open.</figcaption>

@@ -388,6 +388,22 @@ uninstall() {
   log "done — workspace and user files untouched"
 }
 
+warn_early_stage() {
+  printf '\n\033[1;33m%s\033[0m\n' "WARNING: Caravan is early-stage (pre-1.0) software — use at your own risk."
+  cat <<'EOF'
+  * Join a FRESH / throwaway machine (VM, LXC, or a spare box) —
+    NOT one with critical data or production workloads.
+  * Back up first. This installs Node.js + tailscale, joins a mesh, and
+    writes a systemd unit for CodeNomad.
+  * MIT licence: provided "as is", without warranty of any kind.
+EOF
+  if [ -t 0 ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
+    printf 'Continue? [y/N] '
+    read -r ans
+    case "$ans" in y | Y | yes | YES) : ;; *) die "aborted by user" ;; esac
+  fi
+}
+
 main() {
   if [ "$UNINSTALL" = 1 ]; then
     uninstall
@@ -398,6 +414,7 @@ main() {
     stt_report
     return 0
   fi
+  warn_early_stage
   ensure_base_deps
   install_node
   install_codenomad

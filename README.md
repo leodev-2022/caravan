@@ -4,6 +4,12 @@
 
 [Website](https://leodev-2022.github.io/caravan/) · [Docs](docs/) · [Security](SECURITY.md) · MIT
 
+> ⚠️ **Early-stage software — use at your own risk.** Caravan is pre-1.0.
+> **Test it on a fresh, throwaway machine** (a VM, an LXC container, or a spare
+> VPS) — **not** on a server with critical data or production workloads. Back up
+> anything important first. The installer changes the system (installs Docker,
+> uses ports 80/443, runs containers). Provided "as is", without warranty (MIT).
+
 Caravan turns a cheap VPS into a private dashboard for your AI coding agents
 ([OpenCode](https://opencode.ai) / [CodeNomad](https://github.com/NeuralNomadsAI/CodeNomad))
 running across **all** your machines. One command to install, SSO + TOTP at the

@@ -3,6 +3,10 @@
 Everything runs via Docker Compose on the **hub** (`/opt/caravan`). Secrets come
 from `/opt/caravan/.env` (root-only).
 
+> ⚠️ **Pre-1.0 — use at your own risk.** Test on a **fresh / throwaway machine**
+> (VM, LXC, or a spare VPS), **not** on a server with critical data or production
+> workloads. Back up first (see *Backup / restore* below).
+
 ## Bring up / update
 ```bash
 sudo caravan update     # pull latest images + re-apply (keeps secrets/config/data)

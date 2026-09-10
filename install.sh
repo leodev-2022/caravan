@@ -265,7 +265,24 @@ print_summary() {
   fi
 }
 
+warn_early_stage() {
+  printf '\n\033[1;33m%s\033[0m\n' "WARNING: Caravan is early-stage (pre-1.0) software — use at your own risk."
+  cat <<'EOF'
+  * Install on a FRESH / throwaway machine (VM, LXC, or a spare VPS) —
+    NOT on a server with critical data or production workloads.
+  * Back up anything important first. The installer changes the system
+    (installs Docker, uses ports 80/443, runs containers, writes configs).
+  * MIT licence: provided "as is", without warranty of any kind.
+EOF
+  if [ -t 0 ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
+    printf 'Continue? [y/N] '
+    read -r ans
+    case "$ans" in y | Y | yes | YES) : ;; *) die "aborted by user" ;; esac
+  fi
+}
+
 main() {
+  warn_early_stage
   load_config
   [ -n "$DOMAIN_FLAG" ] && DOMAIN="$DOMAIN_FLAG"
   [ "$SELF_SIGNED" = 1 ] && TLS_MODE="internal"
