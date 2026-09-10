@@ -2,6 +2,8 @@
 
 **Your AI coding cockpit — on your own servers, from anywhere.**
 
+[Website](https://leodev-2022.github.io/caravan/) · [Docs](docs/) · [Security](SECURITY.md) · MIT
+
 Caravan turns a cheap VPS into a private dashboard for your AI coding agents
 ([OpenCode](https://opencode.ai) / [CodeNomad](https://github.com/NeuralNomadsAI/CodeNomad))
 running across **all** your machines. One command to install, SSO + TOTP at the
