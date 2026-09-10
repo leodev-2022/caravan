@@ -21,8 +21,12 @@ door, and a self-hosted mesh so your machines never need inbound ports.
 ## Screenshots
 ![Caravan dashboard](docs/img/dashboard.png)
 
-*Live dashboard: per-machine status, locations, tags, and one-click open — all
-behind SSO.*
+*Live dashboard — per-machine status, locations, tags, one-click open, behind SSO
+(dark & light themes).*
+
+![Add an environment](docs/img/add-node.png)
+
+*Register a machine in seconds — onboard it with `node-join.sh`, then add it here.*
 
 ## How it works
 ```
