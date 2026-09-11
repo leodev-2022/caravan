@@ -17,10 +17,13 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _env(name, ip, label, location, tags, aliases=None):
+def _env(name, ip, label, location, tags, aliases=None, engine=None):
     hosts = [name] + (aliases or [])
-    return {"name": name, "aliases": aliases or [], "hosts": hosts, "ip": ip,
-            "port": 9898, "label": label, "location": location, "tags": tags}
+    env = {"name": name, "aliases": aliases or [], "hosts": hosts, "ip": ip,
+           "port": 9898, "label": label, "location": location, "tags": tags}
+    if engine:
+        env["engine"] = engine
+    return env
 
 
 SAMPLE = {
@@ -31,7 +34,7 @@ SAMPLE = {
         _env("api", "100.64.0.11", "API service", "Hetzner · Falkenstein", ["prod"]),
         _env("worker", "100.64.0.12", "Build worker", "Hetzner · Falkenstein", ["ci"]),
         _env("workstation", "100.64.0.13", "Workstation", "Office", ["work"]),
-        _env("laptop", "100.64.0.14", "Laptop", "Office", ["work"]),
+        _env("laptop", "100.64.0.14", "Laptop", "Office", ["work"], engine="opencode"),
         _env("nas", "100.64.0.15", "Home NAS", "Home", ["storage"]),
     ],
 }

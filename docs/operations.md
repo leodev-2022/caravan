@@ -25,6 +25,7 @@ sudo caravan doctor     # diagnose: containers, caddy validate, endpoints
    ```
    - It uses the machine's hostname as the node name (`--name` to override).
    - `--user` / `--workspace-root /` — account + browsable root.
+   - `--engine opencode` — run the **opencode web** UI instead of CodeNomad (port 4096).
    - `--bypass-vpn` — for full-tunnel nodes (see below).
 3. Register it (note the printed mesh IP):
    ```bash

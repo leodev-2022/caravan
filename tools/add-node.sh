@@ -22,6 +22,7 @@ LABEL=""
 LOCATION=""
 TAGS=""
 ALIASES=""
+ENGINE=""
 
 usage() {
   cat <<'EOF'
@@ -36,6 +37,7 @@ Usage: sudo bash add-node.sh --name NAME --ip IP [options]
   --location L       free-text location/group label
   --tags a,b         comma-separated tags
   --aliases x,y      extra subdomains for the same backend
+  --engine NAME      node engine: codenomad (default) or opencode
   --dir DIR          hub directory (default: /opt/caravan)
 EOF
 }
@@ -49,6 +51,7 @@ while [ $# -gt 0 ]; do
     --location) LOCATION="${2:?--location needs a value}"; shift 2 ;;
     --tags) TAGS="${2:?--tags needs a value}"; shift 2 ;;
     --aliases) ALIASES="${2:?--aliases needs a value}"; shift 2 ;;
+    --engine) ENGINE="${2:?--engine needs a value}"; shift 2 ;;
     --dir) CARAVAN_DIR="${2:?--dir needs a value}"; shift 2 ;;
     -h | --help) usage; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
@@ -60,16 +63,18 @@ require_root
 [ -n "$IP" ] || die "--ip is required"
 [ -f "$CARAVAN_DIR/nodes.yaml" ] || die "no nodes.yaml in $CARAVAN_DIR"
 
-python3 - "$CARAVAN_DIR/nodes.yaml" "$NAME" "$IP" "$PORT" "$LABEL" "$LOCATION" "$TAGS" "$ALIASES" <<'PY'
+python3 - "$CARAVAN_DIR/nodes.yaml" "$NAME" "$IP" "$PORT" "$LABEL" "$LOCATION" "$TAGS" "$ALIASES" "$ENGINE" <<'PY'
 import sys
 
 import yaml
 
-path, name, ip, port, label, location, tags, aliases = sys.argv[1:9]
+path, name, ip, port, label, location, tags, aliases, engine = sys.argv[1:10]
 with open(path, encoding="utf-8") as fh:
     data = yaml.safe_load(fh) or {}
 envs = data.get("envs") or []
 env = {"name": name, "ip": ip, "port": int(port)}
+if engine:
+    env["engine"] = engine
 if label:
     env["label"] = label
 if location:

@@ -147,6 +147,7 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .chip{color:var(--muted);font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--line);
   background:var(--panel2);display:inline-flex;align-items:center;gap:6px}
 .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--rc,var(--accent))}
+.engine{font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:var(--panel2)}
 .pill{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
   padding:4px 10px;border-radius:999px;background:rgba(52,211,153,.14);color:var(--ok)}
 .pill.offline{background:rgba(248,113,113,.14);color:var(--down)}
@@ -339,6 +340,7 @@ def render(data, statuses, ts):
              data-tags="{esc(','.join(e.get('tags',[])))}" data-aliases="{esc(','.join(aliases))}">
           <div class="top">
             <span class="chip">{esc(loc)}</span>
+            {f'<span class="engine">{esc(e["engine"])}</span>' if e.get('engine') else ''}
             <span class="pill {'online' if onl else 'offline'}" id="st-{esc(name)}">
               <span class="dot"></span><span class="txt">{st['status']}</span><span class="ms">{st['ms']} ms</span>
             </span>

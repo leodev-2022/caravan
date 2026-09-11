@@ -46,7 +46,9 @@ Usage: sudo bash node-join.sh --hub URL --token KEY [options]
   --name NAME          node name in the mesh (default: hostname)
   --user USER          user that owns the workspace (default: sudo user)
   --workspace-root P   directory CodeNomad may browse (default: user's home)
-  --port N             CodeNomad HTTP port (default: 9898)
+  --port N             HTTP port (default: 9898 codenomad / 4096 opencode)
+  --engine NAME        node engine: codenomad (default) or opencode (web UI)
+  --dry-run            print the plan (engine/port/user) and exit
   --bypass-vpn         route hub/mesh traffic directly when the node full-tunnels
   --hub-ip IP          hub public IP (auto-resolved from --hub when needed)
   --stt                enable local speech-to-text (speaches) with the model
@@ -61,7 +63,9 @@ Usage: sudo bash node-join.sh --hub URL --token KEY [options]
 EOF
 }
 
-NODE_PORT=9898
+NODE_PORT=""
+ENGINE="codenomad"
+DRY_RUN=0
 WITH_STT=0
 STT_MODEL=""
 STT_IMAGE=""
@@ -86,6 +90,8 @@ while [ $# -gt 0 ]; do
     --user) RUN_USER="${2:?--user needs a value}"; shift 2 ;;
     --workspace-root) WORKSPACE_ROOT="${2:?--workspace-root needs a value}"; shift 2 ;;
     --port) NODE_PORT="${2:?--port needs a value}"; shift 2 ;;
+    --engine) ENGINE="${2:?--engine needs a value}"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
     --hub-ip) HUB_IP="${2:?--hub-ip needs a value}"; shift 2 ;;
     --bypass-vpn) BYPASS_VPN=1; shift ;;
     --stt) WITH_STT=1; shift ;;
@@ -113,7 +119,15 @@ if [ "$UNINSTALL" = 0 ] && [ "$STT_CHECK" = 0 ]; then
   RUN_USER="${RUN_USER:-${SUDO_USER:-root}}"
   [ -n "$HEADSCALE_URL" ] || die "--hub is required"
   [ -n "$PREAUTH_KEY" ] || die "--token is required"
-  log "$NODE_NAME -> $HEADSCALE_URL as user $RUN_USER"
+  log "$NODE_NAME -> $HEADSCALE_URL as user $RUN_USER (engine=$ENGINE)"
+fi
+
+case "$ENGINE" in
+  codenomad | opencode) : ;;
+  *) die "unknown engine: $ENGINE (codenomad | opencode)" ;;
+esac
+if [ -z "$NODE_PORT" ]; then
+  if [ "$ENGINE" = opencode ]; then NODE_PORT=4096; else NODE_PORT=9898; fi
 fi
 
 ensure_base_deps() {
@@ -133,13 +147,22 @@ install_node() {
   apt-get install -y -qq nodejs >/dev/null
 }
 
-install_codenomad() {
-  if have codenomad; then
-    log "codenomad already present"
-    return 0
+install_engine() {
+  if [ "$ENGINE" = opencode ]; then
+    if have opencode; then
+      log "opencode already present"
+      return 0
+    fi
+    log "installing opencode (npm -g)"
+    npm install -g opencode-ai >/dev/null
+  else
+    if have codenomad; then
+      log "codenomad already present"
+      return 0
+    fi
+    log "installing opencode + codenomad (npm -g)"
+    npm install -g opencode-ai @neuralnomads/codenomad >/dev/null
   fi
-  log "installing opencode + codenomad (npm -g)"
-  npm install -g opencode-ai @neuralnomads/codenomad >/dev/null
 }
 
 install_tailscale() {
@@ -175,11 +198,23 @@ write_unit() {
   mkdir -p "$workspace"
   wsroot="${WORKSPACE_ROOT:-$workspace}"
   mkdir -p "$wsroot"
-  log "writing systemd unit (user=$RUN_USER port=$NODE_PORT ws=$wsroot)"
+  local desc doc execline workdir
+  if [ "$ENGINE" = opencode ]; then
+    desc="Caravan node (opencode web)"
+    doc="https://opencode.ai/docs/web/"
+    execline="$node_bin/opencode web --port $NODE_PORT --hostname 0.0.0.0"
+    workdir="$wsroot"
+  else
+    desc="Caravan node (CodeNomad)"
+    doc="https://github.com/NeuralNomadsAI/CodeNomad"
+    execline="$node_bin/codenomad --https=false --http=true --host 0.0.0.0 --http-port $NODE_PORT --dangerously-skip-auth --workspace-root $wsroot"
+    workdir="$workspace"
+  fi
+  log "writing systemd unit (engine=$ENGINE user=$RUN_USER port=$NODE_PORT ws=$wsroot)"
   cat > /etc/systemd/system/codenomad.service <<UNIT
 [Unit]
-Description=CodeNomad - OpenCode AI Coding Cockpit
-Documentation=https://github.com/NeuralNomadsAI/CodeNomad
+Description=$desc
+Documentation=$doc
 After=network-online.target
 Wants=network-online.target
 
@@ -189,8 +224,8 @@ User=$RUN_USER
 Group=$RUN_USER
 Environment=HOME=$workspace
 Environment=PATH=$node_bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-WorkingDirectory=$workspace
-ExecStart=$node_bin/codenomad --https=false --http=true --host 0.0.0.0 --http-port $NODE_PORT --dangerously-skip-auth --workspace-root $wsroot
+WorkingDirectory=$workdir
+ExecStart=$execline
 Restart=always
 RestartSec=5
 TimeoutStartSec=60
@@ -431,9 +466,13 @@ main() {
     return 0
   fi
   warn_early_stage
+  if [ "$DRY_RUN" = 1 ]; then
+    log "dry-run: engine=$ENGINE name=$NODE_NAME port=$NODE_PORT user=$RUN_USER ws=${WORKSPACE_ROOT:-<home>}"
+    return 0
+  fi
   ensure_base_deps
   install_node
-  install_codenomad
+  install_engine
   join_mesh
   write_unit
   [ "$BYPASS_VPN" = 1 ] && setup_vpn_bypass

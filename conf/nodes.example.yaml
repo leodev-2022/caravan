@@ -4,6 +4,7 @@
 #   aliases  -> extra subdomains to the same backend
 #   location -> free-text label you set by hand (used for grouping on the portal)
 #   tags     -> free-text labels
+#   engine   -> node engine: codenomad (default) or opencode (web UI)
 envs:
   - name: web1
     ip: 100.64.0.10
@@ -15,7 +16,8 @@ envs:
 
   - name: work
     ip: 100.64.0.11
-    port: 9898
+    port: 4096
     label: "Work workstation"
     location: "Office"
     tags: [work]
+    engine: opencode
