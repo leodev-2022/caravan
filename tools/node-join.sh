@@ -225,6 +225,7 @@ User=$RUN_USER
 Group=$RUN_USER
 Environment=HOME=$workspace
 Environment=PATH=$node_bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NODE_OPTIONS=--max-old-space-size=8192
 WorkingDirectory=$workdir
 ExecStart=$execline
 Restart=always
