@@ -214,14 +214,14 @@ JS = """
   var I18N={
     ru:{filter:"Фильтр: имя, место, тег… (клавиша /)",updated:"обновлено",autorefresh:"автообновление",
         envs:"окружений",open:"Открыть",copyurl:"копировать URL",copyip:"копировать IP",copied:"скопировано",
-        tags:"теги",uptime:"аптайм",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
+        tags:"теги",online_for:"в сети",offline_for:"недоступен",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
         save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
-        tags:"tags",uptime:"uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
+        tags:"tags",online_for:"online for",offline_for:"down for",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
         save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
@@ -275,6 +275,7 @@ JS = """
       var t=p.querySelector('.txt'); if(t) t.textContent=s.status;
       var m=p.querySelector('.ms'); if(m) m.textContent=s.ms+' ms';
       var up=document.getElementById('up-'+n); if(up&&s.since) up.textContent=humanize(Date.now()/1000-s.since);
+      var ul=document.getElementById('upl-'+n); if(ul) ul.textContent=I18N[cur()][s.status==='online'?'online_for':'offline_for'];
     }
   }
   function poll(){fetch('status.json',{cache:'no-store'}).then(function(r){return r.json()}).then(upd).catch(function(){});}
@@ -373,7 +374,7 @@ def render(data, statuses, ts):
           <div class="label">{esc(e.get('label', name))}</div>
           <div class="kv">
             <span>mesh <b>{esc(e['ip'])}:{esc(e['port'])}</b></span>
-            <span><span data-i18n="uptime">аптайм</span> <b id="up-{esc(name)}">{humanize(ts - st.get('since', ts))}</b></span>
+            <span><span id="upl-{esc(name)}" data-i18n="{'online_for' if onl else 'offline_for'}">{'в сети' if onl else 'недоступен'}</span> <b id="up-{esc(name)}">{humanize(ts - st.get('since', ts))}</b></span>
             {'<span><span data-i18n="tags">теги</span> <b>'+esc(tags)+'</b></span>' if tags else ''}
           </div>
           <div class="actions">
