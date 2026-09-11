@@ -1,9 +1,9 @@
 [Unit]
-Description=Watch for CodeNomad hub environment change requests
+Description=Watch for Caravan hub change requests
 After=network-online.target
 
 [Path]
-DirectoryNotEmpty=/opt/hub/requests
+PathChanged=__CARAVAN_DIR__/requests
 
 [Install]
 WantedBy=multi-user.target

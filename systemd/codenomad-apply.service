@@ -1,8 +1,10 @@
 [Unit]
-Description=Apply CodeNomad hub environment change requests
+Description=Apply Caravan hub change requests
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /opt/hub/tools/apply_request.py
+Environment=CARAVAN_DIR=__CARAVAN_DIR__
+ExecStart=/usr/bin/python3 __CARAVAN_DIR__/tools/apply_request.py

@@ -287,6 +287,17 @@ print_summary() {
   fi
 }
 
+install_units() {
+  log "installing host units (systemd)"
+  mkdir -p /etc/systemd/system
+  python3 "$CARAVAN_DIR/render.py" "$CARAVAN_DIR/systemd/codenomad-apply.path" \
+    /etc/systemd/system/codenomad-apply.path "CARAVAN_DIR=$CARAVAN_DIR"
+  python3 "$CARAVAN_DIR/render.py" "$CARAVAN_DIR/systemd/codenomad-apply.service" \
+    /etc/systemd/system/codenomad-apply.service "CARAVAN_DIR=$CARAVAN_DIR"
+  systemctl daemon-reload
+  systemctl enable --now codenomad-apply.path
+}
+
 warn_early_stage() {
   printf '\n\033[1;33m%s\033[0m\n' "WARNING: Caravan is early-stage (pre-1.0) software — use at your own risk."
   cat <<'EOF'
@@ -320,6 +331,7 @@ main() {
   layout_stack
   write_stack_config
   render_configs
+  install_units
   [ "$UPDATE" = 1 ] && pull_images
   start_stack
   print_summary
