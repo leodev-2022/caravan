@@ -17,6 +17,8 @@ HS_CONTAINER="${HS_CONTAINER:-headscale}"
 EXPIRY="1h"
 REUSABLE=""
 USER=""
+COMMAND_ONLY=0
+WRITE_FILE=""
 
 usage() {
   cat <<'EOF'
@@ -28,6 +30,8 @@ Usage: sudo bash invite.sh [--expiry 1h] [--reusable] [--user NAME|ID] [--dir DI
   --reusable      allow the token to be reused
   --user NAME|ID  headscale user (default: the first one)
   --dir DIR       hub directory (default: /opt/caravan)
+  --command-only  print only the one-line join command
+  --write FILE    also write the one-line command to FILE
 EOF
 }
 
@@ -37,6 +41,8 @@ while [ $# -gt 0 ]; do
     --reusable) REUSABLE="--reusable"; shift ;;
     --user) USER="${2:?--user needs a value}"; shift 2 ;;
     --dir) CARAVAN_DIR="${2:?--dir needs a value}"; shift 2 ;;
+    --command-only) COMMAND_ONLY=1; shift ;;
+    --write) WRITE_FILE="${2:?--write needs a path}"; shift 2 ;;
     -h | --help) usage; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
   esac
@@ -76,13 +82,26 @@ if [ -z "$domain" ]; then
 fi
 mesh="https://mesh.${domain}"
 
+cmd="curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh | sudo bash -s -- --hub ${mesh} --token ${key}"
+
+if [ -n "$WRITE_FILE" ]; then
+  mkdir -p "$(dirname "$WRITE_FILE")"
+  printf '%s\n' "$cmd" > "$WRITE_FILE"
+  log "wrote $WRITE_FILE"
+fi
+
+if [ "$COMMAND_ONLY" = 1 ]; then
+  printf '%s\n' "$cmd"
+  exit 0
+fi
+
 cat <<EOF
 
 Token (expires in ${EXPIRY}${REUSABLE:+, reusable}):
   ${key}
 
 On the new machine, run this one line:
-  curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh | sudo bash -s -- --hub ${mesh} --token ${key}
+  ${cmd}
 
 It uses the machine's hostname as the node name (add --name NAME to override).
 EOF

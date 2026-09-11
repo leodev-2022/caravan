@@ -9,9 +9,29 @@ import sys
 
 import yaml
 
-BASE = "/opt/hub"
+BASE = os.environ.get("CARAVAN_DIR", "/opt/hub")
 REQ = os.path.join(BASE, "requests")
 CFG = os.path.join(BASE, "nodes.yaml")
+
+
+def handle_invite(base, req_dir):
+    """Mint a join token and write the one-line command to requests/invite.txt."""
+    out = os.path.join(req_dir, "invite.txt")
+    script = os.path.join(base, "tools", "invite.sh")
+    if not os.path.exists(script):
+        print("[apply] invite: tools/invite.sh not found")
+        return
+    try:
+        r = subprocess.run(
+            ["bash", script, "--command-only", "--write", out, "--dir", base],
+            capture_output=True, text=True, timeout=60,
+        )
+        if r.returncode == 0:
+            print("[apply] invite ready:", r.stdout.strip())
+        else:
+            print("[apply] invite failed:", (r.stderr or r.stdout).strip()[:200])
+    except Exception as e:
+        print("[apply] invite error:", e)
 
 def load():
     with open(CFG, encoding="utf-8") as f:
@@ -46,6 +66,10 @@ def main():
                 req = json.load(f)
         except Exception as e:
             print(f"[apply] bad request {fn}: {e}")
+            os.remove(fn)
+            continue
+        if req.get("action") == "invite":
+            handle_invite(BASE, REQ)
             os.remove(fn)
             continue
         envs, ch = apply_one(envs, req)

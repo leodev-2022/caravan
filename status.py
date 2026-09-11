@@ -167,6 +167,8 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .row input{padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel2);color:var(--ink);font-size:14px}
 .row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(242,153,74,.15)}
 .hint{font-size:12px;color:var(--muted);margin:6px 0 18px}
+.joincmd{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;font-family:var(--mono);
+  font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);max-height:180px;overflow:auto;margin:0 0 16px}
 .modalactions{display:flex;gap:10px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);color:var(--ink);border:1px solid var(--line);
   padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:60;box-shadow:var(--shadow)}
@@ -180,12 +182,14 @@ JS = """
         envs:"окружений",open:"Открыть",copyurl:"копировать URL",copyip:"копировать IP",copied:"скопировано",
         tags:"теги",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
-        save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено"},
+        save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
+        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
         tags:"tags",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
-        save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found"}
+        save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
+        join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
   var locFilter='all';
@@ -249,6 +253,10 @@ JS = """
     var t=e.target.closest('#langtoggle'); if(t){apply(cur()==='ru'?'en':'ru'); return;}
     var th=e.target.closest('#themebtn'); if(th){var c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');return;}
     var ad=e.target.closest('#addbtn'); if(ad){openModal({});return;}
+    var jb=e.target.closest('#joinbtn'); if(jb){document.getElementById('joinmodal').hidden=false;return;}
+    var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
+    var jg=e.target.closest('#jgen'); if(jg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
+    var jcp=e.target.closest('#jcopy'); if(jcp){var t=(document.getElementById('joincmd').textContent||'').trim();if(!t){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(t).then(function(){toast(I18N[cur()].copied);});return;}
     var ed=e.target.closest('[data-edit]'); if(ed){ var c=ed.closest('.card');
       openModal({name:c.getAttribute('data-name'),ip:c.getAttribute('data-ip'),port:c.getAttribute('data-port'),
         label:c.getAttribute('data-label'),location:c.getAttribute('data-location'),
@@ -271,7 +279,7 @@ JS = """
   });
   document.addEventListener('keydown',function(e){
     if(e.key==='/'&&document.activeElement&&document.activeElement.id!=='q'){e.preventDefault();document.getElementById('q').focus();}
-    if(e.key==='Escape'){var m=document.getElementById('modal'); if(m) m.hidden=true;}
+    if(e.key==='Escape'){['modal','joinmodal'].forEach(function(id){var m=document.getElementById(id); if(m) m.hidden=true;});}
   });
   apply(cur()); setTheme(localStorage.getItem('cn_theme')||'dark');
   setInterval(poll,REFRESH); poll();
@@ -281,6 +289,11 @@ JS = """
 def render(data, statuses, ts):
     domain = data.get("domain", "")
     envs = data.get("envs", [])
+    try:
+        with open(os.path.join(REQUESTS_DIR, "invite.txt"), encoding="utf-8") as fh:
+            invite_cmd = fh.read().strip()
+    except Exception:
+        invite_cmd = ""
     locs = []
     for e in envs:
         loc = e.get("location", "") or "—"
@@ -343,6 +356,7 @@ def render(data, statuses, ts):
       <div class="sub">{len(envs)} <span data-i18n="envs">окружений</span></div></div>
     </div>
     <div class="ctrls">
+      <button id="joinbtn" class="iconbtn2" data-i18n="join">Пригласить</button>
       <button id="addbtn" class="addbtn">+ <span data-i18n="add">Добавить</span></button>
       <div class="search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
@@ -372,6 +386,16 @@ def render(data, statuses, ts):
   <div class="modalactions">
     <button id="fcancel" class="mini" data-i18n="cancel">Отмена</button>
     <button id="fsave" class="open" data-i18n="save">Сохранить</button>
+  </div>
+</div></div>
+<div id="joinmodal" class="modal" hidden><div class="box">
+  <h3 data-i18n="jointitle">Подключить машину</h3>
+  <p class="hint" data-i18n="joinhint">Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».</p>
+  <pre id="joincmd" class="joincmd">{esc(invite_cmd)}</pre>
+  <div class="modalactions">
+    <button id="jgen" class="mini" data-i18n="jgenerate">Сгенерировать</button>
+    <button id="jcopy" class="open" data-i18n="jcopy">Копировать</button>
+    <button id="jclose" class="mini" data-i18n="cancel">Закрыть</button>
   </div>
 </div></div>
 <script>{JS.replace('__REFRESH__', str(REFRESH))}</script>
