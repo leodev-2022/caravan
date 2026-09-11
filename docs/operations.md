@@ -14,17 +14,17 @@ sudo caravan doctor     # diagnose: containers, caddy validate, endpoints
 ```
 
 ## Add a node (machine)
-1. On the hub, issue a short-lived join token:
+1. On the hub, get a ready-to-paste invite (mints a short-lived token):
    ```bash
    sudo caravan token --expiry 1h
    ```
-2. On the new machine (root/sudo):
+2. Paste the **one command** it prints on the new machine — no flags to learn:
    ```bash
-   sudo bash node-join.sh --hub https://mesh.example.com --token <key> \
-     --name <name> --user <user> --workspace-root /
+   curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh \
+     | sudo bash -s -- --hub https://mesh.example.com --token <key>
    ```
-   - `--user` — account running CodeNomad (root or a dev user).
-   - `--workspace-root /` — if projects live outside home (e.g. `/opt`).
+   - It uses the machine's hostname as the node name (`--name` to override).
+   - `--user` / `--workspace-root /` — account + browsable root.
    - `--bypass-vpn` — for full-tunnel nodes (see below).
 3. Register it (note the printed mesh IP):
    ```bash

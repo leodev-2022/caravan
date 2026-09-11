@@ -61,12 +61,14 @@ No domain needed — it auto-uses `<your-ip>.sslip.io` for HTTPS. With a domain:
 one-time admin password.
 
 ### 2. A machine (node)
+On the hub, get a ready-to-paste invite:
 ```bash
-sudo bash tools/node-join.sh \
-  --hub https://mesh.example.com --token <key> \
-  --name web1 --user dev --workspace-root /
+sudo caravan token --expiry 1h
 ```
-Get `<key>` on the hub with `sudo caravan token --expiry 1h`.
+It prints **one command** — paste it on the new machine (no flags to learn):
+```bash
+curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh | sudo bash -s -- --hub https://mesh.example.com --token <key>
+```
 
 ### 3. Register the node
 ```bash

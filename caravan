@@ -84,41 +84,6 @@ PY
   esac
 }
 
-cmd_token() {
-  local user="" expiry="1h" reusable=""
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --user) user="${2:?--user needs a value}"; shift 2 ;;
-      --expiry) expiry="${2:?--expiry needs a value}"; shift 2 ;;
-      --reusable) reusable="--reusable"; shift ;;
-      -h | --help)
-        echo "usage: caravan token [--user NAME|ID] [--expiry 1h] [--reusable]"
-        return 0
-        ;;
-      *)
-        echo "caravan token: unknown option: $1" >&2
-        return 1
-        ;;
-    esac
-  done
-  require_docker
-  local uid
-  uid="$(docker exec "$HS_CONTAINER" headscale users list -o json 2>/dev/null | python3 -c '
-import json, sys
-users = json.load(sys.stdin)
-want = sys.argv[1] if len(sys.argv) > 1 else ""
-if want:
-    for u in users:
-        if str(u.get("id")) == want or u.get("name") == want:
-            print(u["id"]); break
-else:
-    print(users[0]["id"] if users else "")
-' "$user")"
-  [ -n "$uid" ] || die "headscale user not found: ${user:-<default>}"
-  # shellcheck disable=SC2086
-  docker exec "$HS_CONTAINER" headscale preauthkeys create --user "$uid" $reusable --expiration "$expiry"
-}
-
 cmd="${1:-}"
 [ $# -gt 0 ] && shift || true
 
@@ -127,7 +92,7 @@ case "$cmd" in
   update) exec bash "$HERE/install.sh" --update "$@" ;;
   doctor) exec bash "$HERE/scripts/doctor.sh" "$@" ;;
   nodes) cmd_nodes "$@" ;;
-  token) cmd_token "$@" ;;
+  token) exec bash "$HERE/tools/invite.sh" "$@" ;;
   add-node) exec bash "$HERE/tools/add-node.sh" "$@" ;;
   remove-node) exec bash "$HERE/tools/remove-node.sh" "$@" ;;
   backup) exec bash "$HERE/tools/backup.sh" "$@" ;;

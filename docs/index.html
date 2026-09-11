@@ -170,9 +170,8 @@ footer a:hover{color:var(--ink)}
   <p class="section-lede">Bring your own server. One command each.</p>
   <div class="grid flow">
     <div class="step"><div class="n">1</div><h3>Hub</h3><pre>curl -fsSL .../caravan/main/install.sh | sudo bash</pre></div>
-    <div class="step"><div class="n">2</div><h3>A machine</h3><pre>sudo bash tools/node-join.sh \
-  --hub https://mesh.example.com \
-  --token &lt;key&gt; --name web1</pre></div>
+    <div class="step"><div class="n">2</div><h3>A machine</h3><pre>curl -fsSL .../node-join.sh | sudo bash -s -- \
+  --hub https://mesh.example.com --token &lt;key&gt;</pre></div>
     <div class="step"><div class="n">3</div><h3>Register</h3><pre>sudo caravan add-node \
   --name web1 --ip &lt;mesh-ip&gt;</pre></div>
   </div>

@@ -11,6 +11,22 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Self-bootstrap: when run via `curl ... | sudo bash -s -- ...`, the repo files
+# are not next to us — fetch the repo and re-exec from there.
+if [ ! -f "$HERE/lib.sh" ] && [ ! -f "$HERE/../scripts/lib.sh" ]; then
+  _tarball="${CARAVAN_TARBALL:-https://github.com/leodev-2022/caravan/archive/refs/heads/main.tar.gz}"
+  _tmp="$(mktemp -d)"
+  echo "[caravan] fetching $_tarball"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$_tarball" | tar xz -C "$_tmp"
+  else
+    wget -qO- "$_tarball" | tar xz -C "$_tmp"
+  fi
+  _script="$(ls -d "$_tmp"/caravan-*/tools/node-join.sh | head -n1)"
+  exec bash "$_script" "$@"
+fi
+
 if [ -f "$HERE/lib.sh" ]; then
   # shellcheck source=lib.sh
   . "$HERE/lib.sh"
