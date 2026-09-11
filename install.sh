@@ -201,7 +201,7 @@ write_env() {
 
 layout_stack() {
   log "laying out stack in $CARAVAN_DIR"
-  mkdir -p "$CARAVAN_DIR"/{conf,tools,systemd,authelia,headscale,caddy,requests}
+  mkdir -p "$CARAVAN_DIR"/{conf,tools,systemd,authelia,headscale,caddy,requests,state}
   cp -f "$HERE/compose/docker-compose.yaml" "$CARAVAN_DIR/docker-compose.yaml"
   cp -f "$HERE/generate_caddy.py" "$HERE/render.py" "$HERE/status.py" "$CARAVAN_DIR/"
   cp -f "$HERE/conf/"*.yml "$HERE/conf/"*.yaml "$CARAVAN_DIR/conf/"

@@ -48,6 +48,7 @@ services:
     environment:
       NODES_JSON: /data/nodes.json
       REQUESTS_DIR: /data/requests
+      STATE_FILE: /data/state/status.json
       PORTAL_REFRESH: "10"
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       TELEGRAM_CHAT: ${TELEGRAM_CHAT}
@@ -55,6 +56,7 @@ services:
       - ./status.py:/app/status.py:ro
       - ./nodes.json:/data/nodes.json:ro
       - ./requests:/data/requests
+      - ./state:/data/state
     networks:
       - hub
     depends_on:

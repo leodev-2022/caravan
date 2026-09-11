@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 NODES_JSON = os.environ.get("NODES_JSON", "/data/nodes.json")
 REQUESTS_DIR = os.environ.get("REQUESTS_DIR", "/data/requests")
+STATE_FILE = os.environ.get("STATE_FILE", "/data/state/status.json")
 REFRESH = int(os.environ.get("PORTAL_REFRESH", "10"))
 TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TG_CHAT = os.environ.get("TELEGRAM_CHAT", "")
@@ -35,6 +36,24 @@ PALETTE = ["#f2994a", "#5b9dff", "#34d399", "#c084fc", "#f472b6", "#22d3ee"]
 def load_data():
     with open(NODES_JSON, encoding="utf-8") as f:
         return json.load(f)
+
+def load_state():
+    try:
+        with open(STATE_FILE, encoding="utf-8") as f:
+            st = json.load(f)
+        return st.get("since", {}) or {}, st.get("status", {}) or {}
+    except Exception:
+        return {}, {}
+
+def save_state():
+    try:
+        d = os.path.dirname(STATE_FILE)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"since": _since, "status": _since_status}, f)
+    except Exception:
+        pass
 
 def check(ip, port):
     t0 = time.time()
@@ -431,19 +450,26 @@ def render(data, statuses, ts):
 </body></html>"""
 
 def refresh_loop():
+    _s_since, _s_status = load_state()
+    _since.update(_s_since)
+    _since_status.update(_s_status)
     while True:
         try:
             data = load_data()
             statuses = {}
             cur = {}
+            changed = False
             for e in data.get("envs", []):
                 st, ms, _ = check(e["ip"], e["port"])
                 name = e["name"]
                 if _since_status.get(name) != st:
                     _since_status[name] = st
                     _since[name] = time.time()
+                    changed = True
                 statuses[name] = {"status": st, "ms": ms, "since": _since.get(name, time.time())}
                 cur[name] = (st, ms)
+            if changed:
+                save_state()
             track_transitions(data.get("envs", []), cur)
             html = render(data, statuses, time.time())
             with _lock:
