@@ -37,6 +37,20 @@ sudo caravan doctor     # diagnose: containers, caddy validate, endpoints
    ```
    …or use the dashboard **+ Add**. `caravan remove-node --name <name>` removes it.
 
+### Windows node
+On a Windows machine, run PowerShell **as Administrator** (the scripts use
+winget for Node.js/Tailscale and register Scheduled Tasks instead of systemd):
+```powershell
+.\tools\node-join.ps1 -Hub https://mesh.example.com -Token <key> -Name pc1
+```
+- It installs Node.js + the engine + Tailscale, joins the mesh, and registers
+  the engine and the metrics agent as Scheduled Tasks (ONSTART, SYSTEM, highest).
+- `-Engine opencode` — run the **opencode web** UI instead of CodeNomad.
+- `-WorkspaceRoot C:\dev` — the browsable root (default: the user's profile).
+- Uninstall: `schtasks /Delete /TN CaravanNode /F ; schtasks /Delete /TN CaravanMetrics /F`.
+- The metrics agent (`tools/metrics.ps1`) reads uptime/CPU/RAM via CIM and binds
+  to the mesh IP only.
+
 ### STT (voice → text), optional per node
 STT is **capability-aware**. On the node, ask for a recommendation first:
 ```bash
