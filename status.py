@@ -28,6 +28,8 @@ _lock = threading.Lock()
 _last_status = {}
 _initialized = [False]
 _ever_online = set()
+_since = {}
+_since_status = {}
 PALETTE = ["#f2994a", "#5b9dff", "#34d399", "#c084fc", "#f472b6", "#22d3ee"]
 
 def load_data():
@@ -76,6 +78,16 @@ def track_transitions(envs, cur):
 
 def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+def humanize(seconds):
+    s = int(max(0, seconds))
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        return f"{s // 60}m"
+    if s < 86400:
+        return f"{s // 3600}h"
+    return f"{s // 86400}d"
 
 def loc_color(loc):
     h = 0
@@ -180,18 +192,19 @@ JS = """
   var I18N={
     ru:{filter:"Фильтр: имя, место, тег… (клавиша /)",updated:"обновлено",autorefresh:"автообновление",
         envs:"окружений",open:"Открыть",copyurl:"копировать URL",copyip:"копировать IP",copied:"скопировано",
-        tags:"теги",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
+        tags:"теги",uptime:"аптайм",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
         save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
-        tags:"tags",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
+        tags:"tags",uptime:"uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
         save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
+  function humanize(sec){sec=Math.max(0,sec|0);if(sec<60)return sec+'s';if(sec<3600)return Math.floor(sec/60)+'m';if(sec<86400)return Math.floor(sec/3600)+'h';return Math.floor(sec/86400)+'d';}
   var locFilter='all';
   function apply(l){
     localStorage.setItem('cn_lang',l); document.documentElement.lang=l;
@@ -237,6 +250,7 @@ JS = """
       p.className='pill '+(s.status==='online'?'online':'offline');
       var t=p.querySelector('.txt'); if(t) t.textContent=s.status;
       var m=p.querySelector('.ms'); if(m) m.textContent=s.ms+' ms';
+      var up=document.getElementById('up-'+n); if(up&&s.since) up.textContent=humanize(Date.now()/1000-s.since);
     }
   }
   function poll(){fetch('status.json',{cache:'no-store'}).then(function(r){return r.json()}).then(upd).catch(function(){});}
@@ -333,6 +347,7 @@ def render(data, statuses, ts):
           <div class="label">{esc(e.get('label', name))}</div>
           <div class="kv">
             <span>mesh <b>{esc(e['ip'])}:{esc(e['port'])}</b></span>
+            <span><span data-i18n="uptime">аптайм</span> <b id="up-{esc(name)}">{humanize(ts - st.get('since', ts))}</b></span>
             {'<span><span data-i18n="tags">теги</span> <b>'+esc(tags)+'</b></span>' if tags else ''}
           </div>
           <div class="actions">
@@ -409,8 +424,12 @@ def refresh_loop():
             cur = {}
             for e in data.get("envs", []):
                 st, ms, _ = check(e["ip"], e["port"])
-                statuses[e["name"]] = {"status": st, "ms": ms}
-                cur[e["name"]] = (st, ms)
+                name = e["name"]
+                if _since_status.get(name) != st:
+                    _since_status[name] = st
+                    _since[name] = time.time()
+                statuses[name] = {"status": st, "ms": ms, "since": _since.get(name, time.time())}
+                cur[name] = (st, ms)
             track_transitions(data.get("envs", []), cur)
             html = render(data, statuses, time.time())
             with _lock:

@@ -36,12 +36,12 @@ SAMPLE = {
     ],
 }
 STATUSES = {
-    "web1": {"status": "online", "ms": 12},
-    "api": {"status": "online", "ms": 9},
-    "worker": {"status": "online", "ms": 27},
-    "workstation": {"status": "online", "ms": 34},
-    "laptop": {"status": "online", "ms": 41},
-    "nas": {"status": "offline", "ms": 0},
+    "web1": {"status": "online", "ms": 12, "since": -3600},
+    "api": {"status": "online", "ms": 9, "since": -90000},
+    "worker": {"status": "online", "ms": 27, "since": -7200},
+    "workstation": {"status": "online", "ms": 34, "since": -259200},
+    "laptop": {"status": "online", "ms": 41, "since": -600},
+    "nas": {"status": "offline", "ms": 0, "since": -120},
 }
 
 
