@@ -182,6 +182,8 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .hint{font-size:12px;color:var(--muted);margin:6px 0 18px}
 .joincmd{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;font-family:var(--mono);
   font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);max-height:180px;overflow:auto;margin:0 0 16px}
+.prov{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.prov .hint{margin-top:0}
 .modalactions{display:flex;gap:10px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);color:var(--ink);border:1px solid var(--line);
   padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:60;box-shadow:var(--shadow)}
@@ -196,13 +198,15 @@ JS = """
         tags:"теги",uptime:"аптайм",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
         save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
-        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение"},
+        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
+        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
         tags:"tags",uptime:"uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
         save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
-        join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first"}
+        join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
+        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo):",provpass:"SSH password",provbtn:"Provision by SSH"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
   function humanize(sec){sec=Math.max(0,sec|0);if(sec<60)return sec+'s';if(sec<3600)return Math.floor(sec/60)+'m';if(sec<86400)return Math.floor(sec/3600)+'h';return Math.floor(sec/86400)+'d';}
@@ -272,6 +276,7 @@ JS = """
     var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
     var jg=e.target.closest('#jgen'); if(jg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
     var jcp=e.target.closest('#jcopy'); if(jcp){var t=(document.getElementById('joincmd').textContent||'').trim();if(!t){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(t).then(function(){toast(I18N[cur()].copied);});return;}
+    var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw},function(){toast(I18N[cur()].applying);});return;}
     var ed=e.target.closest('[data-edit]'); if(ed){ var c=ed.closest('.card');
       openModal({name:c.getAttribute('data-name'),ip:c.getAttribute('data-ip'),port:c.getAttribute('data-port'),
         label:c.getAttribute('data-label'),location:c.getAttribute('data-location'),
@@ -414,6 +419,13 @@ def render(data, statuses, ts):
     <button id="jcopy" class="open" data-i18n="jcopy">Копировать</button>
     <button id="jclose" class="mini" data-i18n="cancel">Закрыть</button>
   </div>
+  <div class="prov">
+    <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба, root или passwordless-sudo):</p>
+    <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10"></div>
+    <div class="row"><label>ssh user</label><input id="p-user" placeholder="root"></div>
+    <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="off"></div>
+    <button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button>
+  </div>
 </div></div>
 <script>{JS.replace('__REFRESH__', str(REFRESH))}</script>
 </body></html>"""
@@ -474,6 +486,7 @@ class Handler(BaseHTTPRequestHandler):
             fn = os.path.join(REQUESTS_DIR, f"{int(time.time()*1000)}-{os.getpid()}.json")
             with open(fn, "w", encoding="utf-8") as f:
                 json.dump(body, f, ensure_ascii=False)
+            os.chmod(fn, 0o600)
             self._send(200, "application/json", '{"ok":true}')
         except Exception as e:
             self._send(400, "application/json", json.dumps({"error": str(e)}))

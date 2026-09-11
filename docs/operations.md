@@ -27,6 +27,10 @@ sudo caravan doctor     # diagnose: containers, caddy validate, endpoints
    - `--user` / `--workspace-root /` — account + browsable root.
    - `--engine opencode` — run the **opencode web** UI instead of CodeNomad (port 4096).
    - `--bypass-vpn` — for full-tunnel nodes (see below).
+   - **Provision by SSH** (portal **Invite → Provision by SSH**, or
+     `sudo bash tools/provision.sh --host IP --user USER --password PW`): the hub
+     SSHes in and onboards a machine **reachable from the hub** (public IP / same
+     network). NAT'd machines must run the one-line command themselves.
 3. Register it (note the printed mesh IP):
    ```bash
    sudo caravan add-node --name <name> --ip <mesh-ip> --port 9898

@@ -14,6 +14,40 @@ REQ = os.path.join(BASE, "requests")
 CFG = os.path.join(BASE, "nodes.yaml")
 
 
+def handle_provision(base, req):
+    """Provision a reachable machine over SSH (tools/provision.sh)."""
+    script = os.path.join(base, "tools", "provision.sh")
+    if not os.path.exists(script):
+        print("[apply] provision: tools/provision.sh not found")
+        return
+    host = str(req.get("host", "")).strip()
+    user = str(req.get("user", "")).strip()
+    if not host or not user:
+        print("[apply] provision: host & user required")
+        return
+    args = ["bash", script, "--dir", base, "--host", host, "--user", user]
+    if req.get("name"):
+        args += ["--name", str(req["name"])]
+    if req.get("engine"):
+        args += ["--engine", str(req["engine"])]
+    env = dict(os.environ)
+    if req.get("password"):
+        env["PROVISION_PASSWORD"] = str(req["password"])
+    elif req.get("key"):
+        args += ["--key", str(req["key"])]
+    else:
+        print("[apply] provision: password or key required")
+        return
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=1800, env=env)
+        for line in (r.stdout or "").strip().splitlines()[-6:]:
+            print("[apply] provision:", line)
+        if r.returncode != 0:
+            print("[apply] provision failed:", (r.stderr or "").strip()[:200])
+    except Exception as e:
+        print("[apply] provision error:", e)
+
+
 def handle_invite(base, req_dir):
     """Mint a join token and write the one-line command to requests/invite.txt."""
     out = os.path.join(req_dir, "invite.txt")
@@ -70,6 +104,10 @@ def main():
             continue
         if req.get("action") == "invite":
             handle_invite(BASE, REQ)
+            os.remove(fn)
+            continue
+        if req.get("action") == "provision":
+            handle_provision(BASE, req)
             os.remove(fn)
             continue
         envs, ch = apply_one(envs, req)
