@@ -39,11 +39,11 @@ SAMPLE = {
     ],
 }
 STATUSES = {
-    "web1": {"status": "online", "ms": 12, "since": -3600},
-    "api": {"status": "online", "ms": 9, "since": -90000},
-    "worker": {"status": "online", "ms": 27, "since": -7200},
-    "workstation": {"status": "online", "ms": 34, "since": -259200},
-    "laptop": {"status": "online", "ms": 41, "since": -600},
+    "web1": {"status": "online", "ms": 12, "since": -3600, "cpu": 4.2, "mem": 38.0, "uptime": 1036800},
+    "api": {"status": "online", "ms": 9, "since": -90000, "cpu": 12.5, "mem": 55.0, "uptime": 2592000},
+    "worker": {"status": "online", "ms": 27, "since": -7200, "cpu": 91.0, "mem": 82.0, "uptime": 432000},
+    "workstation": {"status": "online", "ms": 34, "since": -259200, "cpu": 2.0, "mem": 40.0, "uptime": 7776000},
+    "laptop": {"status": "online", "ms": 41, "since": -600, "cpu": 8.0, "mem": 60.0, "uptime": 10800},
     "nas": {"status": "offline", "ms": 0, "since": -120},
 }
 

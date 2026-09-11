@@ -143,6 +143,17 @@ def humanize(seconds):
         return f"{s // 3600}h"
     return f"{s // 86400}d"
 
+def mcls(v):
+    try:
+        v = float(v)
+    except Exception:
+        return ""
+    if v >= 90:
+        return "hot"
+    if v >= 75:
+        return "warm"
+    return ""
+
 def loc_color(loc):
     h = 0
     for ch in (loc or "?"):
@@ -153,7 +164,7 @@ CSS = """
 :root{--accent:#f2994a;--accent2:#ffb26b;--accent-ink:#20160a;
   --bg:#0b0f14;--panel:#131922;--panel2:#0f151d;--line:#222c38;--line2:#303c4a;
   --ink:#e9eff7;--muted:#8a99ad;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --ok:#34d399;--down:#f87171;--radius:12px;--radius-sm:8px;
+  --ok:#34d399;--down:#f87171;--warn:#fbbf24;--radius:12px;--radius-sm:8px;
   --shadow:0 10px 30px -14px rgba(0,0,0,.7)}
 [data-theme="light"]{--bg:#f6f8fb;--panel:#ffffff;--panel2:#fbfcfe;--line:#e3e8ef;--line2:#d4dae3;
   --ink:#0f1b2a;--muted:#5b6b7f;--shadow:0 10px 30px -14px rgba(15,27,42,.22)}
@@ -210,11 +221,15 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .pill .ms{color:var(--muted);font-weight:500}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
 .title{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.aliaschip{font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:middle}
+.aliaschip:hover{text-decoration:none;border-color:var(--accent)}
 .label{color:var(--muted);font-size:13px;margin:2px 0 12px}
 .kv{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-bottom:14px}
 .kv b{color:var(--ink);font-weight:600;font-family:var(--mono)}
 .metrics{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:-6px 0 14px;font-family:var(--mono)}
 .metrics b{color:var(--ink);font-weight:600}
+.metrics b.warm{color:var(--warn)}
+.metrics b.hot{color:var(--down)}
 .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .open{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--accent-ink);font-weight:700;
   font-size:13px;padding:9px 14px;border-radius:var(--radius-sm);border:1px solid transparent;transition:background .15s}
@@ -223,6 +238,8 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
   font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
 .mini:hover{color:var(--ink);border-color:var(--line2);background:var(--panel2)}
 .mini.del:hover{color:#fff;background:var(--down);border-color:var(--down)}
+.mini svg{width:15px;height:15px;display:block}
+.mini{padding:9px}
 .aliases{margin-top:12px;font-size:12px;color:var(--muted)}
 .aliases a{margin-right:12px}
 .foot{color:var(--muted);font-size:12px;margin-top:auto;padding-top:36px;text-align:center}
@@ -271,6 +288,7 @@ JS = """
     localStorage.setItem('cn_lang',l); document.documentElement.lang=l;
     document.querySelectorAll('[data-i18n]').forEach(function(el){var k=el.getAttribute('data-i18n'); if(I18N[l][k]!=null) el.textContent=I18N[l][k];});
     document.querySelectorAll('[data-i18n-ph]').forEach(function(el){var k=el.getAttribute('data-i18n-ph'); if(I18N[l][k]!=null) el.placeholder=I18N[l][k];});
+    document.querySelectorAll('[data-i18n-title]').forEach(function(el){var k=el.getAttribute('data-i18n-title'); if(I18N[l][k]!=null) el.title=I18N[l][k];});
     var t=document.getElementById('langtoggle'); if(t) t.textContent=(l==='ru'?'EN':'RU');
   }
   function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('cn_theme',t);
@@ -312,9 +330,9 @@ JS = """
       var t=p.querySelector('.txt'); if(t) t.textContent=s.status;
       var m=p.querySelector('.ms'); if(m) m.textContent=s.ms+' ms';
       var up=document.getElementById('up-'+n); if(up&&s.since) up.textContent=humanize(Date.now()/1000-s.since);
-      var ul=document.getElementById('upl-'+n); if(ul) ul.textContent=I18N[cur()][s.status==='online'?'online_for':'offline_for'];
-      var mc=document.getElementById('mc-'+n); if(mc&&s.cpu!=null) mc.textContent=s.cpu+'%';
-      var mm=document.getElementById('mm-'+n); if(mm&&s.mem!=null) mm.textContent=s.mem+'%';
+      if(s.since) p.title=(I18N[cur()][s.status==='online'?'online_for':'offline_for'])+' '+humanize(Date.now()/1000-s.since);
+      var mc=document.getElementById('mc-'+n); if(mc&&s.cpu!=null){mc.textContent=s.cpu+'%';mc.className=s.cpu>=90?'hot':(s.cpu>=75?'warm':'');}
+      var mm=document.getElementById('mm-'+n); if(mm&&s.mem!=null){mm.textContent=s.mem+'%';mm.className=s.mem>=90?'hot':(s.mem>=75?'warm':'');}
       var mt=document.getElementById('mt-'+n); if(mt&&s.uptime!=null) mt.textContent=humanize(s.uptime);
     }
   }
@@ -326,9 +344,7 @@ JS = """
     var cf=e.target.closest('.chipf'); if(cf){ locFilter=cf.getAttribute('data-location');
       document.querySelectorAll('.chipf').forEach(function(x){x.classList.toggle('active',x===cf);}); filters(); return; }
     var b=e.target.closest('[data-copy]');
-    if(b){navigator.clipboard.writeText(b.getAttribute('data-copy')).then(function(){
-      var k=b.getAttribute('data-i18n'); var old=b.textContent; b.textContent=I18N[cur()].copied;
-      setTimeout(function(){ b.textContent = k?I18N[cur()][k]:old; },900);}); return;}
+    if(b){navigator.clipboard.writeText(b.getAttribute('data-copy')).then(function(){toast(I18N[cur()].copied);}); return;}
     var t=e.target.closest('#langtoggle'); if(t){apply(cur()==='ru'?'en':'ru'); return;}
     var th=e.target.closest('#themebtn'); if(th){var c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');return;}
     var ad=e.target.closest('#addbtn'); if(ad){openModal({});return;}
@@ -396,14 +412,16 @@ def render(data, statuses, ts):
             canon = e.get("hosts", [name])[0]
             url = f"https://{canon}.{domain}/"
             aliases = [h for h in e.get("hosts", []) if h != canon]
-            alias_html = "".join(f'<a target="_blank" rel="noopener" href="https://{esc(a)}.{esc(domain)}/">{esc(a)}.{esc(domain)}</a>' for a in aliases)
+            alias_chips = "".join(
+                f'<a class="aliaschip" target="_blank" rel="noopener" title="https://{esc(a)}.{esc(domain)}/" '
+                f'href="https://{esc(a)}.{esc(domain)}/">{esc(a)}</a>' for a in aliases)
             search = f"{name} {e.get('label','')} {loc} {' '.join(e.get('tags',[]))}".lower()
             tags = ", ".join(esc(t) for t in e.get("tags", []))
             mparts = []
             if st.get("cpu") is not None:
-                mparts.append(f'<span>cpu <b id="mc-{esc(name)}">{st["cpu"]}%</b></span>')
+                mparts.append(f'<span>cpu <b id="mc-{esc(name)}" class="{mcls(st["cpu"])}">{st["cpu"]}%</b></span>')
             if st.get("mem") is not None:
-                mparts.append(f'<span>ram <b id="mm-{esc(name)}">{st["mem"]}%</b></span>')
+                mparts.append(f'<span>ram <b id="mm-{esc(name)}" class="{mcls(st["mem"])}">{st["mem"]}%</b></span>')
             if st.get("uptime"):
                 mparts.append(f'<span><span data-i18n="os_up">os up</span> <b id="mt-{esc(name)}">{humanize(st["uptime"])}</b></span>')
             metrics_html = '<div class="metrics">' + " · ".join(mparts) + "</div>" if mparts else ""
@@ -414,25 +432,24 @@ def render(data, statuses, ts):
           <div class="top">
             <span class="chip">{esc(loc)}</span>
             {f'<span class="engine">{esc(e["engine"])}</span>' if e.get('engine') else ''}
-            <span class="pill {'online' if onl else 'offline'}" id="st-{esc(name)}">
+            <span class="pill {'online' if onl else 'offline'}" id="st-{esc(name)}"
+                  title="{'в сети' if onl else 'недоступен'} {humanize(ts - st.get('since', ts))}">
               <span class="dot"></span><span class="txt">{st['status']}</span><span class="ms">{st['ms']} ms</span>
             </span>
           </div>
-          <div class="title">{esc(name)}</div>
+          <div class="title">{esc(name)} {alias_chips}</div>
           <div class="label">{esc(e.get('label', name))}</div>
           <div class="kv">
             <span>mesh <b>{esc(e['ip'])}:{esc(e['port'])}</b></span>
-            <span><span id="upl-{esc(name)}" data-i18n="{'online_for' if onl else 'offline_for'}">{'в сети' if onl else 'недоступен'}</span> <b id="up-{esc(name)}">{humanize(ts - st.get('since', ts))}</b></span>
             {'<span><span data-i18n="tags">теги</span> <b>'+esc(tags)+'</b></span>' if tags else ''}
           </div>
           {metrics_html}
           <div class="actions">
             <a class="open" target="_blank" rel="noopener" href="{url}"><span data-i18n="open">Открыть</span> &rarr;</a>
-            <button class="mini" data-copy="{url}" data-i18n="copyurl">копировать URL</button>
-            <button class="mini" data-edit="1" data-i18n="edit">Изменить</button>
-            <button class="mini del" data-del="{esc(name)}" data-i18n="delete">Удалить</button>
+            <button class="mini" data-copy="{url}" data-i18n-title="copyurl" title="копировать URL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+            <button class="mini" data-edit="1" data-i18n-title="edit" title="Изменить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+            <button class="mini del" data-del="{esc(name)}" data-i18n-title="delete" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
           </div>
-          {f'<div class="aliases">{alias_html}</div>' if alias_html else ''}
         </div>""")
         sections.append(f'<div class="groupwrap"><h2 class="group"><span class="dot"></span>{esc(loc)}<span class="chev">▾</span></h2><div class="grid">{"".join(cards)}</div></div>')
     body = "".join(sections) if sections else '<div class="empty" data-i18n="empty">Ничего не найдено</div>'
