@@ -64,6 +64,7 @@ EOF
 }
 
 NODE_PORT=""
+METRICS_PORT=9101
 ENGINE="codenomad"
 DRY_RUN=0
 WITH_STT=0
@@ -238,6 +239,35 @@ WantedBy=multi-user.target
 UNIT
   systemctl daemon-reload
   systemctl enable --now codenomad
+}
+
+install_metrics() {
+  local dir="/opt/caravan-node"
+  mkdir -p "$dir"
+  cp -f "$HERE/metrics.py" "$dir/metrics.py"
+  local mesh_ip
+  mesh_ip="$(tailscale ip -4 2>/dev/null | head -n1)"
+  [ -n "$mesh_ip" ] || mesh_ip="0.0.0.0"
+  cat > /etc/systemd/system/caravan-metrics.service <<UNIT
+[Unit]
+Description=Caravan node metrics (mesh-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=METRICS_HOST=$mesh_ip
+Environment=METRICS_PORT=$METRICS_PORT
+ExecStart=/usr/bin/python3 $dir/metrics.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now caravan-metrics.service
+  log "metrics on http://$mesh_ip:$METRICS_PORT/metrics"
 }
 
 setup_vpn_bypass() {
@@ -427,6 +457,8 @@ uninstall() {
   fi
   systemctl disable --now codenomad 2>/dev/null || true
   rm -f /etc/systemd/system/codenomad.service
+  systemctl disable --now caravan-metrics.service 2>/dev/null || true
+  rm -f /etc/systemd/system/caravan-metrics.service
   systemctl disable --now codenomad-mesh-route.service 2>/dev/null || true
   rm -f /etc/systemd/system/codenomad-mesh-route.service
   systemctl daemon-reload
@@ -475,6 +507,7 @@ main() {
   install_engine
   join_mesh
   write_unit
+  install_metrics
   [ "$BYPASS_VPN" = 1 ] && setup_vpn_bypass
   [ "$WITH_STT" = 1 ] && setup_stt
   local ip

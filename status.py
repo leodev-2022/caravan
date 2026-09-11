@@ -63,6 +63,13 @@ def check(ip, port):
     except Exception:
         return "offline", int((time.time() - t0) * 1000), None
 
+def check_metrics(ip, port):
+    try:
+        with urllib.request.urlopen(f"http://{ip}:{port}/metrics", timeout=1.5) as r:
+            return json.load(r)
+    except Exception:
+        return {}
+
 def notify(text):
     if not (TG_TOKEN and TG_CHAT):
         return
@@ -178,6 +185,8 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .label{color:var(--muted);font-size:13px;margin:2px 0 12px}
 .kv{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-bottom:14px}
 .kv b{color:var(--ink);font-weight:600;font-family:var(--mono)}
+.metrics{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:-6px 0 14px;font-family:var(--mono)}
+.metrics b{color:var(--ink);font-weight:600}
 .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .open{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--accent-ink);font-weight:700;
   font-size:13px;padding:9px 14px;border-radius:var(--radius-sm);border:1px solid transparent;transition:background .15s}
@@ -214,14 +223,14 @@ JS = """
   var I18N={
     ru:{filter:"Фильтр: имя, место, тег… (клавиша /)",updated:"обновлено",autorefresh:"автообновление",
         envs:"окружений",open:"Открыть",copyurl:"копировать URL",copyip:"копировать IP",copied:"скопировано",
-        tags:"теги",online_for:"в сети",offline_for:"недоступен",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
+        tags:"теги",online_for:"в сети",offline_for:"недоступен",os_up:"аптайм ОС",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
         save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
-        tags:"tags",online_for:"online for",offline_for:"down for",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
+        tags:"tags",online_for:"online for",offline_for:"down for",os_up:"os uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
         save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
@@ -276,6 +285,9 @@ JS = """
       var m=p.querySelector('.ms'); if(m) m.textContent=s.ms+' ms';
       var up=document.getElementById('up-'+n); if(up&&s.since) up.textContent=humanize(Date.now()/1000-s.since);
       var ul=document.getElementById('upl-'+n); if(ul) ul.textContent=I18N[cur()][s.status==='online'?'online_for':'offline_for'];
+      var mc=document.getElementById('mc-'+n); if(mc&&s.cpu!=null) mc.textContent=s.cpu+'%';
+      var mm=document.getElementById('mm-'+n); if(mm&&s.mem!=null) mm.textContent=s.mem+'%';
+      var mt=document.getElementById('mt-'+n); if(mt&&s.uptime!=null) mt.textContent=humanize(s.uptime);
     }
   }
   function poll(){fetch('status.json',{cache:'no-store'}).then(function(r){return r.json()}).then(upd).catch(function(){});}
@@ -359,6 +371,14 @@ def render(data, statuses, ts):
             alias_html = "".join(f'<a target="_blank" rel="noopener" href="https://{esc(a)}.{esc(domain)}/">{esc(a)}.{esc(domain)}</a>' for a in aliases)
             search = f"{name} {e.get('label','')} {loc} {' '.join(e.get('tags',[]))}".lower()
             tags = ", ".join(esc(t) for t in e.get("tags", []))
+            mparts = []
+            if st.get("cpu") is not None:
+                mparts.append(f'<span>cpu <b id="mc-{esc(name)}">{st["cpu"]}%</b></span>')
+            if st.get("mem") is not None:
+                mparts.append(f'<span>ram <b id="mm-{esc(name)}">{st["mem"]}%</b></span>')
+            if st.get("uptime"):
+                mparts.append(f'<span><span data-i18n="os_up">os up</span> <b id="mt-{esc(name)}">{humanize(st["uptime"])}</b></span>')
+            metrics_html = '<div class="metrics">' + " · ".join(mparts) + "</div>" if mparts else ""
             cards.append(f"""
         <div class="card" data-search="{esc(search)}" data-location="{esc(loc)}" style="--rc:{lcol}"
              data-name="{esc(name)}" data-ip="{esc(e['ip'])}" data-port="{esc(e['port'])}" data-label="{esc(e.get('label',''))}"
@@ -377,6 +397,7 @@ def render(data, statuses, ts):
             <span><span id="upl-{esc(name)}" data-i18n="{'online_for' if onl else 'offline_for'}">{'в сети' if onl else 'недоступен'}</span> <b id="up-{esc(name)}">{humanize(ts - st.get('since', ts))}</b></span>
             {'<span><span data-i18n="tags">теги</span> <b>'+esc(tags)+'</b></span>' if tags else ''}
           </div>
+          {metrics_html}
           <div class="actions">
             <a class="open" target="_blank" rel="noopener" href="{url}"><span data-i18n="open">Открыть</span> &rarr;</a>
             <button class="mini" data-copy="{url}" data-i18n="copyurl">копировать URL</button>
@@ -467,7 +488,13 @@ def refresh_loop():
                     _since_status[name] = st
                     _since[name] = time.time()
                     changed = True
-                statuses[name] = {"status": st, "ms": ms, "since": _since.get(name, time.time())}
+                entry = {"status": st, "ms": ms, "since": _since.get(name, time.time())}
+                if st == "online":
+                    m = check_metrics(e["ip"], e.get("metrics_port", 9101))
+                    for k in ("uptime", "cpu", "mem"):
+                        if k in m:
+                            entry[k] = m[k]
+                statuses[name] = entry
                 cur[name] = (st, ms)
             if changed:
                 save_state()
