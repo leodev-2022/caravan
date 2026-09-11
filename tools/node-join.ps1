@@ -18,6 +18,7 @@ param(
     [int]$Port = 0,
     [string]$WorkspaceRoot = $env:USERPROFILE,
     [int]$MetricsPort = 9101,
+    [switch]$Yes,
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
@@ -32,8 +33,10 @@ if ($DryRun) {
     Write-Host "[caravan] dry-run: engine=$Engine name=$Name port=$Port metrics=$MetricsPort hub=$Hub ws=$WorkspaceRoot"
     return
 }
-$ans = Read-Host 'Continue? [y/N]'
-if ($ans -notmatch '^[yY]') { Write-Host 'aborted'; exit 1 }
+if (-not $Yes) {
+    $ans = Read-Host 'Continue? [y/N]'
+    if ($ans -notmatch '^[yY]') { Write-Host 'aborted'; exit 1 }
+}
 
 function Have([string]$c) { $null -ne (Get-Command $c -ErrorAction SilentlyContinue) }
 function Refresh-Path {
@@ -43,33 +46,62 @@ function Refresh-Path {
 
 # --- Node.js ---
 if (-not (Have node)) {
-    Write-Host '[caravan] installing Node.js (winget)'
-    winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+    Write-Host '[caravan] resolving latest Node.js LTS'
+    $idx = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' -TimeoutSec 30
+    $ver = ($idx | Where-Object { $_.lts } | Select-Object -First 1).version
+    $msi = Join-Path $env:TEMP "node-$ver-$arch.msi"
+    Write-Host "[caravan] downloading Node.js $ver ($arch)"
+    Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/$ver/node-$ver-$arch.msi" -OutFile $msi -TimeoutSec 600
+    Write-Host '[caravan] installing Node.js (msi)'
+    Start-Process msiexec.exe -Wait -ArgumentList "/i `"$msi`" /qn /norestart"
+    Remove-Item $msi -Force -ErrorAction SilentlyContinue
     Refresh-Path
 }
 if (-not (Have node)) { throw 'node not found after install — reopen the shell and retry' }
 
 # --- engine ---
+# NB: resolve the npm .cmd shim (not the .ps1) so a batch/scheduled task can run it.
+$prefix = (& npm prefix -g | Select-Object -First 1).Trim()
 if ($Engine -eq 'opencode') {
     if (-not (Have opencode)) { npm install -g opencode-ai }
-    $exe = (Get-Command opencode -ErrorAction SilentlyContinue).Source
-    if (-not $exe) { $exe = Join-Path $env:APPDATA 'npm\opencode.cmd' }
+    $exe = Join-Path $prefix 'opencode.cmd'
+    if (-not (Test-Path $exe)) { $exe = (Get-Command opencode -ErrorAction SilentlyContinue).Source }
     $exeArgs = "web --port $Port --hostname 0.0.0.0"
 } else {
     if (-not (Have codenomad)) { npm install -g @neuralnomads/codenomad opencode-ai }
-    $exe = (Get-Command codenomad -ErrorAction SilentlyContinue).Source
-    if (-not $exe) { $exe = Join-Path $env:APPDATA 'npm\codenomad.cmd' }
+    $exe = Join-Path $prefix 'codenomad.cmd'
+    if (-not (Test-Path $exe)) { $exe = (Get-Command codenomad -ErrorAction SilentlyContinue).Source }
     $exeArgs = "--https=false --http=true --host 0.0.0.0 --http-port $Port --dangerously-skip-auth --workspace-root `"$WorkspaceRoot`""
 }
 
-# --- Tailscale (mesh) ---
-if (-not (Have tailscale)) {
-    Write-Host '[caravan] installing Tailscale (winget)'
-    winget install --id Tailscale.Tailscale -e --accept-source-agreements --accept-package-agreements
-    Refresh-Path
+# The engine runs as SYSTEM, which does not see the per-user npm dir. Expose it
+# machine-wide and point CodeNomad at the direct opencode .exe, so it does not
+# use its racy ".cmd" wrapper path (which fails with "unknown PID").
+$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+if (($machinePath -split ';') -notcontains $prefix) {
+    [Environment]::SetEnvironmentVariable('Path', ($machinePath.TrimEnd(';') + ';' + $prefix), 'Machine')
 }
+if ($Engine -eq 'codenomad') {
+    $ocExe = Join-Path $prefix 'node_modules\opencode-ai\bin\opencode.exe'
+    $cfgDir = Join-Path $env:windir 'system32\config\systemprofile\.config\codenomad'
+    New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+    Set-Content -Path (Join-Path $cfgDir 'config.yaml') -Encoding UTF8 -Value "server:`n  opencodeBinary: '$ocExe'`n"
+}
+
+# --- Tailscale (mesh) ---
 $ts = (Get-Command tailscale -ErrorAction SilentlyContinue).Source
-if (-not $ts) { $ts = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe' }
+if (-not $ts) { $cand = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'; if (Test-Path $cand) { $ts = $cand } }
+if (-not $ts) {
+    Write-Host '[caravan] downloading Tailscale'
+    $setup = Join-Path $env:TEMP 'tailscale-setup.exe'
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe' -OutFile $setup -TimeoutSec 600
+    Write-Host '[caravan] installing Tailscale'
+    Start-Process $setup -Wait -ArgumentList '/quiet'
+    Remove-Item $setup -Force -ErrorAction SilentlyContinue
+    $ts = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
+}
+if (-not $ts -or -not (Test-Path $ts)) { throw 'tailscale.exe not found after install' }
 Write-Host "[caravan] joining mesh as $Name"
 & $ts up "--login-server=$Hub" "--authkey=$Token" "--hostname=$Name" '--accept-dns=false'
 Start-Sleep -Seconds 4
