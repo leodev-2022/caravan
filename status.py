@@ -319,6 +319,8 @@ JS = """
     document.getElementById('f-location').value=env.location||'';
     document.getElementById('f-tags').value=(env.tags||[]).join(', ');
     document.getElementById('f-aliases').value=(env.aliases||[]).join(', ');
+    document.getElementById('f-engine').value=env.engine||'';
+    document.getElementById('modal').setAttribute('data-original',env.name||'');
     document.querySelector('#modal h3').textContent=(env.name?I18N[cur()].edittitle:I18N[cur()].addtitle);
     document.getElementById('modal').hidden=false;
   }
@@ -355,18 +357,19 @@ JS = """
     var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw},function(){toast(I18N[cur()].applying);});return;}
     var ed=e.target.closest('[data-edit]'); if(ed){ var c=ed.closest('.card');
       openModal({name:c.getAttribute('data-name'),ip:c.getAttribute('data-ip'),port:c.getAttribute('data-port'),
-        label:c.getAttribute('data-label'),location:c.getAttribute('data-location'),
+        label:c.getAttribute('data-label'),location:c.getAttribute('data-location'),engine:c.getAttribute('data-engine'),
         tags:(c.getAttribute('data-tags')||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
         aliases:(c.getAttribute('data-aliases')||'').split(',').map(function(s){return s.trim();}).filter(Boolean)}); return;}
     var cx=e.target.closest('#fcancel'); if(cx){document.getElementById('modal').hidden=true;return;}
     var sv=e.target.closest('#fsave'); if(sv){
       var v=function(id){return (document.getElementById(id).value||'').trim();};
       var env={name:v('f-name'),ip:v('f-ip'),port:parseInt(v('f-port')||'9898',10)||9898,
-        label:v('f-label'),location:v('f-location'),
+        label:v('f-label'),location:v('f-location'),engine:v('f-engine'),
         tags:v('f-tags').split(',').map(function(s){return s.trim();}).filter(Boolean),
         aliases:v('f-aliases').split(',').map(function(s){return s.trim();}).filter(Boolean)};
       if(!env.name||!env.ip){alert('name & mesh IP required');return;}
-      post({action:'add',env:env},function(){ toast(I18N[cur()].applying); setTimeout(function(){location.reload();},9000); });
+      var orig=document.getElementById('modal').getAttribute('data-original')||'';
+      post({action:'add',env:env,original_name:orig},function(){ toast(I18N[cur()].applying); setTimeout(function(){location.reload();},9000); });
       return;}
     var del=e.target.closest('[data-del]'); if(del){
       if(confirm(I18N[cur()].delconfirm+' '+del.getAttribute('data-del')+'?')){
@@ -428,7 +431,7 @@ def render(data, statuses, ts):
             cards.append(f"""
         <div class="card" data-search="{esc(search)}" data-location="{esc(loc)}" style="--rc:{lcol}"
              data-name="{esc(name)}" data-ip="{esc(e['ip'])}" data-port="{esc(e['port'])}" data-label="{esc(e.get('label',''))}"
-             data-tags="{esc(','.join(e.get('tags',[])))}" data-aliases="{esc(','.join(aliases))}">
+             data-tags="{esc(','.join(e.get('tags',[])))}" data-aliases="{esc(','.join(aliases))}" data-engine="{esc(e.get('engine',''))}">
           <div class="top">
             <span class="chip">{esc(loc)}</span>
             {f'<span class="engine">{esc(e["engine"])}</span>' if e.get('engine') else ''}
@@ -494,6 +497,7 @@ def render(data, statuses, ts):
   <div class="row"><label data-i18n="flocation">Место</label><input id="f-location" placeholder="My server · Hetzner"></div>
   <div class="row"><label data-i18n="ftags">Теги (через запятую)</label><input id="f-tags"></div>
   <div class="row"><label data-i18n="faliases">Алиасы (через запятую)</label><input id="f-aliases"></div>
+  <div class="row"><label>engine</label><select id="f-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
   <div class="hint" data-i18n="fhint">Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.</div>
   <div class="modalactions">
     <button id="fcancel" class="mini" data-i18n="cancel">Отмена</button>

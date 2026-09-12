@@ -79,8 +79,23 @@ def apply_one(envs, req):
     """Apply a single add/delete request to the envs list. Returns (envs, changed)."""
     act = req.get("action", "add")
     if act == "add" and isinstance(req.get("env"), dict) and req["env"].get("name"):
-        env = req["env"]
-        return [e for e in envs if e.get("name") != env["name"]] + [env], True
+        env = dict(req["env"])
+        # An edit may rename the node: `original_name` is the name it had before.
+        # Drop the old record too (otherwise the rename appends a duplicate card).
+        original = str(req.get("original_name") or "").strip()
+        names = {env["name"]}
+        if original:
+            names.add(original)
+        prev = next((e for e in envs if original and e.get("name") == original), None)
+        if prev is None:
+            prev = next((e for e in envs if e.get("name") == env["name"]), None)
+        # Keep the engine when an older edit form did not send one.
+        if "engine" not in env and prev and prev.get("engine"):
+            env["engine"] = prev["engine"]
+        if not env.get("engine"):
+            env.pop("engine", None)
+        kept = [e for e in envs if e.get("name") not in names]
+        return kept + [env], True
     if act == "delete" and req.get("name"):
         kept = [e for e in envs if e.get("name") != req["name"]]
         return kept, len(kept) != len(envs)

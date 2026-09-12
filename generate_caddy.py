@@ -118,6 +118,7 @@ for e in envs:
         "label": e.get("label", e["name"]),
         "location": e.get("location", ""),
         "tags": list(e.get("tags", [])),
+        "engine": e.get("engine", ""),
     })
 with open(os.path.join(BASE, "nodes.json"), "w", encoding="utf-8") as f:
     json.dump({"domain": domain, "auth_url": auth_url, "envs": portal_envs}, f, ensure_ascii=False, indent=2)
