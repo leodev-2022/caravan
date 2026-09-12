@@ -169,7 +169,11 @@ def main():
             if action == "delete" and label:
                 delete_from_mesh(label)
         os.remove(fn)
-        _apply_status(status=("ok" if ok else "error"), action=action, name=label,
+        final_name = label
+        if action == "provision" and ok and "nodes.yaml:" in msg:
+            # the provision registers under the machine's hostname — show that name
+            final_name = msg.split("nodes.yaml:", 1)[1].split("->", 1)[0].strip() or label
+        _apply_status(status=("ok" if ok else "error"), action=action, name=final_name,
                       message=msg, finished=time.time())
     if changed:
         data["envs"] = envs
