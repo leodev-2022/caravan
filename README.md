@@ -42,6 +42,11 @@ by itself.*
 *Two ways: copy the one-line command, or the “magic” SSH form (hub installs and
 registers the machine for you).*
 
+![The agent cockpit](docs/img/agent.png)
+
+*Destination: the CodeNomad agent cockpit — chat, tool calls, code and results, all
+in the browser behind SSO.*
+
 ![Add a machine](docs/img/add-node.png)
 
 *Prefer it manual? Register a machine by its mesh IP.*
