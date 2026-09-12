@@ -182,7 +182,7 @@ def apply_one(envs, req):
         if not env.get("engine"):
             env.pop("engine", None)
         kept = [e for e in envs if e.get("name") not in names]
-        return kept + [env], True
+        return [*kept, env], True
     if act == "delete" and req.get("name"):
         kept = [e for e in envs if e.get("name") != req["name"]]
         return kept, len(kept) != len(envs)

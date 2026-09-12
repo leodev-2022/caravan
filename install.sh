@@ -368,8 +368,7 @@ register_admin_totp() {
   [ -f "$script" ] || script="$HERE/scripts/register-totp.py"
   [ -f "$script" ] || return 0
   log "waiting for Authelia to become ready"
-  local i
-  for i in $(seq 1 30); do
+  for _ in $(seq 1 30); do
     curl -fsS -k --max-time 5 "https://auth.$DOMAIN/api/health" >/dev/null 2>&1 && break
     sleep 2
   done

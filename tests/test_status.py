@@ -81,14 +81,14 @@ class StatusTest(unittest.TestCase):
         if not node:
             self.skipTest("node not available")
         status = load_status()
-        fh = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
-        try:
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
             fh.write(status.JS.replace("__REFRESH__", "10"))
-            fh.close()
-            r = subprocess.run([node, "--check", fh.name], capture_output=True, text=True)
+            path = fh.name
+        try:
+            r = subprocess.run([node, "--check", path], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
         finally:
-            os.unlink(fh.name)
+            os.unlink(path)
 
 
 if __name__ == "__main__":
