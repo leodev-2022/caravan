@@ -65,6 +65,19 @@ The hub authenticates with either:
 > In the PVE GUI, paste the key straight into the creation wizard's **“SSH public
 > key”** field (or `pct create ... --ssh-public-keys FILE`).
 
+> **Proxmox LXC needs TUN (otherwise the node can't join the mesh).** An
+> unprivileged container has no `/dev/net/tun`, so `tailscaled` fails and the node
+> never comes online. `node-join.sh` detects this up front and stops with guidance.
+> Fix it on the **Proxmox host**:
+> ```bash
+> pct set <VMID> -features nesting=1
+> # if that is not enough, add to /etc/pve/lxc/<VMID>.conf:
+> #   lxc.cgroup2.devices.allow: c 10:200 rwm
+> #   lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+> pct reboot <VMID>          # then verify inside: ls -l /dev/net/tun
+> ```
+> A **VM** works out of the box — if in doubt, use a VM for nodes.
+
 ### Windows node
 On a Windows machine, run PowerShell **as Administrator** (registers Scheduled
 Tasks instead of systemd; Node.js and Tailscale are downloaded directly, so

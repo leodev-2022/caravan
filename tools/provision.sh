@@ -100,7 +100,22 @@ token="$(bash "$CARAVAN_DIR/tools/invite.sh" --token-only --dir "$CARAVAN_DIR" |
 JOIN_ARGS="--hub $MESH --token $token"
 if [ -n "$NAME" ]; then JOIN_ARGS="$JOIN_ARGS --name $NAME"; fi
 if [ -n "$ENGINE" ]; then JOIN_ARGS="$JOIN_ARGS --engine $ENGINE"; fi
-remote="curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh | ${SUDO}bash -s -- $JOIN_ARGS"
+JOIN_URL="https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh"
+# Fresh minimal images (e.g. a Proxmox LXC) often have neither curl nor wget,
+# yet the join is fetched with one of them — ensure a downloader first.
+remote=$(cat <<EOF
+set -e
+if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+  ${SUDO}apt-get update -qq >/dev/null 2>&1 || true
+  ${SUDO}apt-get install -y -qq curl >/dev/null 2>&1 || true
+fi
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$JOIN_URL"
+else
+  wget -qO- "$JOIN_URL"
+fi | ${SUDO}bash -s -- $JOIN_ARGS
+EOF
+)
 
 log "provisioning $USER@$HOST (this can take a few minutes)"
 # shellcheck disable=SC2029

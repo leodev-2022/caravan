@@ -508,6 +508,29 @@ EOF
   fi
 }
 
+check_tun() {
+  # Tailscale needs a TUN device. Unprivileged Proxmox LXC containers have no
+  # /dev/net/tun by default and tailscaled then fails cryptically *after* a long
+  # install — fail fast with actionable guidance instead.
+  [ -e /dev/net/tun ] && return 0
+  cat >&2 <<'EOF'
+
+[caravan] /dev/net/tun is missing — Tailscale cannot start, so this machine
+          cannot join the mesh. In an unprivileged Proxmox LXC this is the
+          default. Fix one of these and re-run:
+
+  A) On the Proxmox host, allow TUN for the container:
+       pct set <VMID> -features nesting=1
+     If that is not enough, add to /etc/pve/lxc/<VMID>.conf:
+       lxc.cgroup2.devices.allow: c 10:200 rwm
+       lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+     then: pct reboot <VMID>      (verify inside: ls -l /dev/net/tun)
+
+  B) Use a VM instead of a container — TUN works out of the box.
+EOF
+  die "cannot join the mesh without /dev/net/tun"
+}
+
 main() {
   if [ "$UNINSTALL" = 1 ]; then
     uninstall
@@ -523,6 +546,7 @@ main() {
     log "dry-run: engine=$ENGINE name=$NODE_NAME port=$NODE_PORT user=$RUN_USER ws=${WORKSPACE_ROOT:-<home>}"
     return 0
   fi
+  check_tun
   ensure_base_deps
   install_node
   install_engine

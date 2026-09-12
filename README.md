@@ -123,6 +123,11 @@ caravan uninstall [--purge]
   inbound ports required. For **dashboard provisioning** the hub must reach the
   machine over SSH: a root password, or (for Proxmox LXC/VM, where root has no
   password by default) the hub's public key in `authorized_keys`.
+- **Proxmox LXC needs TUN.** Unprivileged containers have no `/dev/net/tun`, so
+  Tailscale can't start and the machine can't join the mesh. Enable it on the host
+  (`pct set <VMID> -features nesting=1`, or add the `dev/net/tun` bind mount — see
+  [Operations](docs/operations.md#add-a-node-machine)), or use a **VM** instead
+  (TUN works out of the box). `node-join.sh` checks this up front and tells you.
 
 ## Documentation
 - [Architecture](docs/architecture.md)
