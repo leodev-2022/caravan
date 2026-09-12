@@ -62,7 +62,7 @@ PY
 mesh_id="$(docker exec "${HS_CONTAINER:-headscale}" headscale nodes list -o json 2>/dev/null |
   python3 -c 'import json,sys; n=sys.argv[1]; s=sys.stdin.read() or "[]"; nodes=json.loads(s); print(next((x.get("id") for x in nodes if (x.get("given_name") or x.get("name")) == n), ""))' "$NAME" 2>/dev/null || true)"
 if [ -n "$mesh_id" ]; then
-  docker exec "${HS_CONTAINER:-headscale}" headscale nodes delete -i "$mesh_id" -y >/dev/null 2>&1 || true
+  docker exec "${HS_CONTAINER:-headscale}" headscale nodes delete -i "$mesh_id" --force >/dev/null 2>&1 || true
   log "removed $NAME from the mesh"
 fi
 

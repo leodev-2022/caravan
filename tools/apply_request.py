@@ -26,8 +26,11 @@ def delete_from_mesh(name):
                     if (n.get("given_name") or n.get("name")) == name), None)
         if nid is None:
             return False
-        subprocess.run(["docker", "exec", HS, "headscale", "nodes", "delete",
-                        "-i", str(nid), "-y"], capture_output=True, text=True, timeout=20)
+        r = subprocess.run(["docker", "exec", HS, "headscale", "nodes", "delete",
+                            "-i", str(nid), "--force"], capture_output=True, text=True, timeout=20)
+        if r.returncode != 0:
+            print("[apply] mesh delete failed:", (r.stderr or "").strip()[:200])
+            return False
         print(f"[apply] removed {name} from the mesh (headscale)")
         return True
     except Exception:
