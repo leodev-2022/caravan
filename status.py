@@ -302,7 +302,7 @@ JS = """
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль SSH (необязательно)",provbtn:"Провизжинить по SSH",provname:"Имя узла",
-        keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ",
+        keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
         tags:"tags",online_for:"online for",offline_for:"down for",os_up:"os uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
