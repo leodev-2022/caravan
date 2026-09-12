@@ -117,7 +117,13 @@ schtasks /Run /TN 'CaravanNode' | Out-Null
 
 # --- metrics agent as a Scheduled Task (bound to the mesh IP) ---
 $mPath = Join-Path $dir 'metrics.ps1'
-Copy-Item -Force (Join-Path $PSScriptRoot 'metrics.ps1') $mPath
+$srcMetrics = Join-Path $PSScriptRoot 'metrics.ps1'
+if (-not (Test-Path $srcMetrics)) {
+    Write-Host '[caravan] fetching metrics.ps1'
+    $url = 'https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/metrics.ps1'
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $srcMetrics -TimeoutSec 60
+}
+Copy-Item -Force $srcMetrics $mPath
 $mCmd = Join-Path $dir 'metrics.cmd'
 Set-Content -Path $mCmd -Encoding ASCII -Value "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"$mPath`" -BindHost $meshIp -Port $MetricsPort"
 schtasks /Create /TN 'CaravanMetrics' /TR "`"$mCmd`"" /SC ONSTART /RU SYSTEM /RL HIGHEST /F | Out-Null

@@ -63,6 +63,13 @@ out.append(f"  redir https://hub.{domain}{{uri}} permanent")
 out.append("}")
 out.append("")
 out.append(f"mesh.{domain} {{")
+if tls_mode == "internal":
+    # Serve the internal CA so nodes can trust the control server (tailscale
+    # validates its TLS strictly).
+    out.append("  handle /ca.crt {")
+    out.append("    root * /data/caddy/pki/authorities/local")
+    out.append("    file_server")
+    out.append("  }")
 out.append("  reverse_proxy headscale:8080")
 out.append("}")
 out.append("")

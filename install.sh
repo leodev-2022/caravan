@@ -115,8 +115,8 @@ load_config() {
 }
 
 resolve_tls() {
-  local ip=""
-  # zero questions: if no domain was given, fall back to <public-ip>.sslip.io
+  local ip="" local_ip=""
+  # zero questions: if no domain was given, fall back to <ip>.sslip.io
   if [ "$SSLIP" = 1 ] || [ -z "$DOMAIN" ]; then
     ip="${HUB_IP:-}"
     if [ -z "$ip" ]; then
@@ -124,6 +124,16 @@ resolve_tls() {
         curl -fsS --max-time 8 https://ifconfig.me 2>/dev/null || true)"
     fi
     [ -n "$ip" ] || die "cannot determine public IP — set HUB_IP in caravan.env or pass --domain"
+    local_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    # If the public IP is not bound to this host, we are behind NAT: sslip.io +
+    # ACME (HTTP-01 on :80) cannot validate. Fall back to the internal CA and a
+    # locally resolvable <ip>.sslip.io name so the browser still reaches us.
+    if [ "$SSLIP" = 0 ] && [ "$TLS_MODE" != "internal" ] && ! ip -4 -o addr show 2>/dev/null | grep -qw "$ip"; then
+      warn "public IP $ip is not on this machine (behind NAT?) — sslip.io/ACME would fail"
+      warn "falling back to --self-signed (browser will warn); pass --domain NAME for trusted TLS"
+      TLS_MODE="internal"
+      ip="${local_ip:-$ip}"
+    fi
     DOMAIN="$(printf '%s' "$ip" | tr '.' '-').sslip.io"
     SSLIP=1
     log "no domain given — using sslip.io: $DOMAIN"

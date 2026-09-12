@@ -56,9 +56,10 @@ Nodes: CodeNomad on :9898 (mesh-only, HTTP)   [+ optional local STT]
 ```bash
 curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/install.sh | sudo bash
 ```
-No domain needed — it auto-uses `<your-ip>.sslip.io` for HTTPS. With a domain:
-`… | sudo bash -s -- --domain example.com`. It prints the dashboard URL and a
-one-time admin password.
+No domain needed — on a VPS with a public IP it auto-uses `<your-ip>.sslip.io` for
+trusted HTTPS. Behind NAT (a home/lab box) it auto-falls back to a self-signed
+cert — the browser will warn (pass `--domain example.com` for trusted TLS). It
+prints the dashboard URL and a one-time admin password.
 
 ### 2. A machine (node)
 On the hub, get a ready-to-paste invite:
@@ -69,6 +70,14 @@ It prints **one command** — paste it on the new machine (no flags to learn):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh | sudo bash -s -- --hub https://mesh.example.com --token <key>
 ```
+
+**Windows node** (Windows 10/11) — run PowerShell **as Administrator**:
+```powershell
+curl.exe -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.ps1 -o node-join.ps1
+.\node-join.ps1 -Hub https://mesh.example.com -Token <key> -Name pc1
+```
+It installs Node.js + the engine + Tailscale (direct downloads — no winget) and
+registers both as Scheduled Tasks. Use the same `<key>` from `caravan token`.
 
 ### 3. Register the node
 ```bash
@@ -92,7 +101,8 @@ caravan uninstall [--purge]
 ## Requirements
 - **Hub:** any Ubuntu/Debian VPS; a public IP for ACME — or use `--sslip` /
   `--self-signed`. Runs comfortably on 1 vCPU / 2 GB.
-- **Nodes:** Ubuntu/Debian. No public IP and no inbound ports required.
+- **Nodes:** Ubuntu/Debian, or Windows 10/11 (PowerShell). No public IP and no
+  inbound ports required.
 
 ## Documentation
 - [Architecture](docs/architecture.md)

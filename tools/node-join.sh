@@ -179,8 +179,28 @@ install_tailscale() {
   apt-get install -y -qq tailscale >/dev/null
 }
 
+install_hub_ca() {
+  local host="${HEADSCALE_URL#*://}"
+  host="${host%%/*}"
+  # Real (ACME) TLS: the cert is trusted, nothing to do. Self-signed hub: trust
+  # the CA the hub serves at /ca.crt so tailscale can reach the control server.
+  if curl -fsS --max-time 8 "https://${host}/health" >/dev/null 2>&1; then
+    return 0
+  fi
+  log "hub certificate is not trusted — fetching the hub CA (self-signed mode)"
+  mkdir -p /usr/local/share/ca-certificates
+  if curl -fsS -k --max-time 8 "https://${host}/ca.crt" \
+    -o /usr/local/share/ca-certificates/caravan-hub.crt 2>/dev/null; then
+    update-ca-certificates >/dev/null 2>&1 || true
+    log "installed the hub CA"
+  else
+    warn "could not fetch https://${host}/ca.crt — tailscale may fail on a self-signed hub"
+  fi
+}
+
 join_mesh() {
   install_tailscale
+  install_hub_ca
   if tailscale status >/dev/null 2>&1; then
     log "already joined to the mesh"
   else
