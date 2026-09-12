@@ -50,8 +50,9 @@ Tasks instead of systemd; Node.js and Tailscale are downloaded directly, so
 - `-WorkspaceRoot C:\dev` — the browsable root (default: the user's profile).
 - `-Yes` — skip the confirmation prompt (unattended/SSH runs); `-DryRun` prints the plan.
 - Uninstall: `schtasks /Delete /TN CaravanNode /F ; schtasks /Delete /TN CaravanMetrics /F`.
-- The metrics agent (`tools/metrics.ps1`) reads uptime/CPU/RAM via CIM and binds
-  to the mesh IP only.
+- The metrics agent (`tools/metrics.ps1`) reads uptime/CPU/RAM via fast Win32 APIs
+  (`GlobalMemoryStatusEx`/`GetSystemTimes`; WMI/CIM can take seconds per query) and
+  binds to the mesh IP only.
 
 ### STT (voice → text), optional per node
 STT is **capability-aware**. On the node, ask for a recommendation first:

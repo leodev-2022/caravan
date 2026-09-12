@@ -93,7 +93,7 @@ def check(ip, port):
 
 def check_metrics(ip, port):
     try:
-        with urllib.request.urlopen(f"http://{ip}:{port}/metrics", timeout=1.5) as r:
+        with urllib.request.urlopen(f"http://{ip}:{port}/metrics", timeout=2.5) as r:
             return json.load(r)
     except Exception:
         return {}
