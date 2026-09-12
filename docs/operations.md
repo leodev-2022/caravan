@@ -36,7 +36,10 @@ Two ways: run **one command** on the machine (works everywhere), or let the hub
    ```bash
    sudo caravan add-node --name <name> --ip <mesh-ip> --port 9898
    ```
-   …or use the dashboard **+ Add**. `caravan remove-node --name <name>` removes it.
+   …or use the dashboard **+ Add**. New mesh nodes are registered **automatically**
+   (a hub timer watches headscale), so the one-command join needs no manual step.
+   Deleting a node (dashboard 🗑 or `caravan remove-node --name <name>`) also drops
+   it from the mesh — otherwise the sync would re-add it.
 
 ### Option B — provision over SSH (dashboard “magic”)
 Dashboard **Invite → Provision by SSH** (or `sudo bash tools/provision.sh --host IP

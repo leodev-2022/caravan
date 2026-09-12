@@ -13,6 +13,25 @@ import yaml
 BASE = os.environ.get("CARAVAN_DIR", "/opt/hub")
 REQ = os.path.join(BASE, "requests")
 CFG = os.path.join(BASE, "nodes.yaml")
+HS = os.environ.get("HS_CONTAINER", "headscale")
+
+
+def delete_from_mesh(name):
+    """Remove the node from headscale too — otherwise the auto-sync re-adds it."""
+    try:
+        r = subprocess.run(["docker", "exec", HS, "headscale", "nodes", "list", "-o", "json"],
+                           capture_output=True, text=True, timeout=20)
+        nodes = json.loads(r.stdout or "[]")
+        nid = next((n.get("id") for n in nodes
+                    if (n.get("given_name") or n.get("name")) == name), None)
+        if nid is None:
+            return False
+        subprocess.run(["docker", "exec", HS, "headscale", "nodes", "delete",
+                        "-i", str(nid), "-y"], capture_output=True, text=True, timeout=20)
+        print(f"[apply] removed {name} from the mesh (headscale)")
+        return True
+    except Exception:
+        return False
 
 
 def _apply_status(**kw):
@@ -144,6 +163,8 @@ def main():
             if ch:
                 changed = True
                 print(f"[apply] {action} {label}")
+            if action == "delete" and label:
+                delete_from_mesh(label)
         os.remove(fn)
         _apply_status(status=("ok" if ok else "error"), action=action, name=label,
                       message=msg, finished=time.time())
