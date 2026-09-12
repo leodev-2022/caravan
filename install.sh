@@ -314,6 +314,19 @@ register_admin_totp() {
   fi
 }
 
+ensure_qrencode() {
+  have qrencode && return 0
+  have apt-get || return 1
+  apt-get install -y -qq qrencode >/dev/null 2>&1 || return 1
+  have qrencode
+}
+
+print_qr() {
+  # $1 = text to encode; renders an ASCII QR that a phone can scan off-screen
+  have qrencode || return 1
+  qrencode -t ANSIUTF8 -o - "$1" 2>/dev/null
+}
+
 print_summary() {
   echo
   log "Caravan hub is up."
@@ -329,9 +342,14 @@ print_summary() {
   if [ -n "$ADMIN_OTPAUTH" ]; then
     local secret="${ADMIN_OTPAUTH##*secret=}"
     secret="${secret%%&*}"
-    printf '    TOTP   : add this to your authenticator app (Google Authenticator, Aegis, ...):\n'
-    printf '             otpauth: %s\n' "$ADMIN_OTPAUTH"
-    printf '             secret : %s\n' "$secret"
+    printf '    TOTP   : scan this QR with your authenticator app (Google Authenticator, Aegis, ...):\n\n'
+    if print_qr "$ADMIN_OTPAUTH"; then
+      printf '\n'
+      printf '             (if the QR will not scan, add the key below manually)\n'
+    else
+      printf '             (no qrencode — add manually) otpauth: %s\n' "$ADMIN_OTPAUTH"
+    fi
+    printf '             manual key: %s\n' "$secret"
     printf '             then log in with the 6-digit code it shows\n'
   else
     printf '    first login: register TOTP when prompted\n'
@@ -384,6 +402,7 @@ main() {
   install_secrets
   write_env
   install_python
+  ensure_qrencode || true
   layout_stack
   write_stack_config
   render_configs
