@@ -139,13 +139,20 @@ ensure_base_deps() {
 }
 
 install_node() {
+  local major=0
   if have node; then
+    major="$(node --version 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/')"
+  fi
+  # need npm too: a distro nodejs package can ship without it, and Node < 20 is
+  # too old for the engines — reinstall via NodeSource in either case.
+  if have node && have npm && [ "${major:-0}" -ge 20 ]; then
     log "node already present ($(node --version))"
     return 0
   fi
   log "installing Node.js 22 (NodeSource)"
   retry bash -c 'curl -fsSL https://deb.nodesource.com/setup_22.x | bash -'
   apt-get install -y -qq nodejs >/dev/null
+  have npm || apt-get install -y -qq npm >/dev/null 2>&1 || true
 }
 
 install_engine() {
@@ -534,6 +541,16 @@ EOF
   die "cannot join the mesh without /dev/net/tun"
 }
 
+check_not_hub() {
+  # Onboarding the hub itself is almost always a mistake (it is already on the
+  # mesh) — stop with a clear message instead of confusing partial results.
+  [ "${CARAVAN_ALLOW_HUB_NODE:-0}" = 1 ] && return 0
+  if [ -f /opt/caravan/caravan.env ] && have docker &&
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -qx headscale; then
+    die "this machine is the Caravan HUB (headscale runs here) — run node-join on the NEW machine, not the hub"
+  fi
+}
+
 main() {
   if [ "$UNINSTALL" = 1 ]; then
     uninstall
@@ -550,6 +567,7 @@ main() {
     return 0
   fi
   check_tun
+  check_not_hub
   ensure_base_deps
   install_node
   install_engine
