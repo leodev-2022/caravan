@@ -142,7 +142,7 @@ footer a:hover{color:var(--ink)}
     <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></div><h3>Multi-machine by default</h3><p>One window to every dev box — home, office, VPS. Switch between them instantly, from anywhere.</p></div>
     <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 6.6-7 8-4-1.4-7-4-7-8V6z"/><path d="M9.3 12l1.9 1.9 3.5-3.6"/></svg></div><h3>Secure by default</h3><p>Default-deny firewall, SSO + TOTP, mesh-only nodes, root-only secrets. Hardening is built in, not a checklist.</p></div>
     <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-6.6-6.6V4h10l6.6 6.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></div><h3>Private &amp; cheap</h3><p>Runs on a ~$3 VPS (1 vCPU / 2 GB). No SaaS, no telemetry — your code stays on your infra.</p></div>
-    <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div><h3>One command</h3><p>Idempotent <span class="mono">install.sh</span> for the hub and <span class="mono">node-join.sh</span> for machines. Update and diagnose with the <span class="mono">caravan</span> CLI.</p></div>
+    <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div><h3>One command</h3><p>Idempotent <span class="mono">install.sh</span> for the hub and <span class="mono">node-join.sh</span> (Linux) / <span class="mono">node-join.ps1</span> (Windows) for machines. Update and diagnose with the <span class="mono">caravan</span> CLI.</p></div>
   </div>
 </div></section>
 
@@ -171,7 +171,10 @@ footer a:hover{color:var(--ink)}
   <div class="grid flow">
     <div class="step"><div class="n">1</div><h3>Hub</h3><pre>curl -fsSL .../caravan/main/install.sh | sudo bash</pre></div>
     <div class="step"><div class="n">2</div><h3>A machine</h3><pre>curl -fsSL .../node-join.sh | sudo bash -s -- \
-  --hub https://mesh.example.com --token &lt;key&gt;</pre></div>
+  --hub https://mesh.example.com --token &lt;key&gt;
+
+<span class="c"># Windows (PowerShell, as Administrator):</span>
+.\node-join.ps1 -Hub https://mesh.example.com -Token &lt;key&gt;</pre></div>
     <div class="step"><div class="n">3</div><h3>Register</h3><pre>sudo caravan add-node \
   --name web1 --ip &lt;mesh-ip&gt;</pre></div>
   </div>
@@ -183,6 +186,7 @@ footer a:hover{color:var(--ink)}
   <details open><summary>Do I need a domain?</summary><p>No. Use <span class="mono">--sslip</span> (a working name from your IP) or <span class="mono">--self-signed</span> for testing. A domain is best for production.</p></details>
   <details><summary>Do my machines need public IPs or open ports?</summary><p>No. Nodes dial <b>out</b> to the hub over a WireGuard mesh — nothing to expose.</p></details>
   <details><summary>Is my code sent anywhere?</summary><p>No. Everything runs on your own infrastructure. Caravan has no telemetry.</p></details>
+  <details><summary>Does it work on Windows machines?</summary><p>Yes. The hub runs on Linux (Ubuntu/Debian), but nodes can be Linux or Windows 10/11 — use <span class="mono">node-join.ps1</span> in PowerShell (as Administrator) on Windows.</p></details>
   <details><summary>Is it free?</summary><p>Yes — MIT. A managed cloud and team features are planned (open-core).</p></details>
   <details><summary>Is it affiliated with OpenCode / CodeNomad?</summary><p>No. Caravan consumes them as dependencies and credits them. Not affiliated with NeuralNomadsAI or the OpenCode team.</p></details>
 </div></section>
