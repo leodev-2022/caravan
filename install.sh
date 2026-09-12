@@ -197,6 +197,20 @@ install_secrets() {
   fi
 }
 
+install_provision_key() {
+  # keypair the hub uses to provision nodes over SSH. The portal shows the
+  # public half, so a new machine only needs it in ~/.ssh/authorized_keys.
+  local d="$CARAVAN_DIR/.ssh"
+  mkdir -p "$d"
+  chmod 700 "$d"
+  if [ ! -f "$d/id_ed25519" ]; then
+    have ssh-keygen || apt-get install -y -qq openssh-client >/dev/null 2>&1 || true
+    ssh-keygen -t ed25519 -N "" -C caravan-provision -f "$d/id_ed25519" -q 2>/dev/null || true
+  fi
+  chmod 600 "$d/id_ed25519" 2>/dev/null || true
+  chmod 644 "$d/id_ed25519.pub" 2>/dev/null || true
+}
+
 write_env() {
   local envf="$CARAVAN_DIR/.env"
   if [ -f "$envf" ]; then
@@ -223,6 +237,7 @@ layout_stack() {
   cp -f "$HERE/conf/"*.yml "$HERE/conf/"*.yaml "$CARAVAN_DIR/conf/"
   cp -f "$HERE/tools/"*.py "$HERE/tools/"*.sh "$CARAVAN_DIR/tools/" 2>/dev/null || true
   mkdir -p "$CARAVAN_DIR/scripts"
+  cp -f "$HERE/scripts/lib.sh" "$CARAVAN_DIR/scripts/lib.sh"
   cp -f "$HERE/scripts/register-totp.py" "$CARAVAN_DIR/scripts/" 2>/dev/null || true
   cp -f "$HERE/systemd/"*.service "$HERE/systemd/"*.path "$CARAVAN_DIR/systemd/" 2>/dev/null || true
   if [ ! -f "$CARAVAN_DIR/nodes.yaml" ]; then
@@ -410,6 +425,7 @@ main() {
   install_python
   ensure_qrencode || true
   layout_stack
+  install_provision_key
   write_stack_config
   render_configs
   install_units

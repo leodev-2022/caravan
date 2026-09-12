@@ -127,7 +127,16 @@ for e in envs:
         "tags": list(e.get("tags", [])),
         "engine": e.get("engine", ""),
     })
+# the hub's provisioning public key (the portal shows it so a new machine only
+# needs it in authorized_keys). It is a public key, safe to surface.
+pubkey = ""
+try:
+    with open(os.path.join(BASE, ".ssh", "id_ed25519.pub"), encoding="utf-8") as f:
+        pubkey = f.read().strip()
+except OSError:
+    pass
 with open(os.path.join(BASE, "nodes.json"), "w", encoding="utf-8") as f:
-    json.dump({"domain": domain, "auth_url": auth_url, "envs": portal_envs}, f, ensure_ascii=False, indent=2)
+    json.dump({"domain": domain, "auth_url": auth_url, "provision_pubkey": pubkey,
+               "envs": portal_envs}, f, ensure_ascii=False, indent=2)
 
 print(f"generated {len(envs)} env route(s) [{tls_mode} TLS]; wrote caddy/Caddyfile + nodes.json")

@@ -14,6 +14,11 @@ sudo caravan doctor     # diagnose: containers, caddy validate, endpoints
 ```
 
 ## Add a node (machine)
+
+Two ways: run **one command** on the machine (works everywhere), or let the hub
+**provision it over SSH** from the dashboard.
+
+### Option A — one command (recommended; no SSH needed)
 1. On the hub, get a ready-to-paste invite (mints a short-lived token):
    ```bash
    sudo caravan token --expiry 1h
@@ -27,15 +32,38 @@ sudo caravan doctor     # diagnose: containers, caddy validate, endpoints
    - `--user` / `--workspace-root /` — account + browsable root.
    - `--engine opencode` — run the **opencode web** UI instead of CodeNomad (port 4096).
    - `--bypass-vpn` — for full-tunnel nodes (see below).
-   - **Provision by SSH** (portal **Invite → Provision by SSH**, or
-     `sudo bash tools/provision.sh --host IP --user USER --password PW`): the hub
-     SSHes in and onboards a machine **reachable from the hub** (public IP / same
-     network). NAT'd machines must run the one-line command themselves.
 3. Register it (note the printed mesh IP):
    ```bash
    sudo caravan add-node --name <name> --ip <mesh-ip> --port 9898
    ```
    …or use the dashboard **+ Add**. `caravan remove-node --name <name>` removes it.
+
+### Option B — provision over SSH (dashboard “magic”)
+Dashboard **Invite → Provision by SSH** (or `sudo bash tools/provision.sh --host IP
+--user USER ...`). The hub logs in, onboards a machine **reachable from the hub**
+(public IP / same network), and **registers it automatically**. NAT'd machines must
+run the one-command join themselves.
+
+The hub authenticates with either:
+- **the hub's SSH key (recommended)** — its public half is shown in the **Invite**
+  dialog; add it to the target's `authorized_keys` and leave the password empty; or
+- **a password** (`sshpass`) — only where password SSH is enabled.
+
+> **Proxmox LXC/VM gotcha.** A fresh Debian/Ubuntu container template has **no root
+> password**, and sshd defaults to `PermitRootLogin prohibit-password`, so password
+> login always fails (“Permission denied”) no matter what you type. Fix it either way:
+> ```bash
+> # 1) run the Option-A command in the container console (no SSH at all):
+> pct enter <VMID>     # then paste the join command
+>
+> # 2) add the hub public key, then Provision by SSH with a blank password:
+> pct enter <VMID>
+> mkdir -p /root/.ssh
+> echo "<HUB PUBLIC KEY>" >> /root/.ssh/authorized_keys
+> chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys
+> ```
+> In the PVE GUI, paste the key straight into the creation wizard's **“SSH public
+> key”** field (or `pct create ... --ssh-public-keys FILE`).
 
 ### Windows node
 On a Windows machine, run PowerShell **as Administrator** (registers Scheduled
@@ -87,8 +115,13 @@ is intentionally NOT behind SSO, so node joins keep working.
   backend answers `curl http://<mesh-ip>:9898/`.
 - **Service won't start on a node** → `203/EXEC` usually means wrong npm-global
   path; node-join.sh now auto-detects it, or fix the unit's `ExecStart`/`PATH`.
-- **Authelia «registered but can't log in»** → TOTP must be enrolled via the
-  portal (file backend doesn't store TOTP); completion needs the email/mailbox.
+- **Dashboard provisioning fails with «Permission denied» on a container** → the
+  target has no root password / `PermitRootLogin prohibit-password`. Add the hub's
+  public key (Invite dialog) to `authorized_keys`, or run the one-command join in
+  the console. See *Option B* above.
+- **Lost the TOTP** → on the hub, `python3 scripts/register-totp.py` re-runs
+  registration via the Authelia API and prints a fresh `otpauth://` (the installer
+  does this automatically and prints it once).
 
 ### Node unreachable over the mesh (TCP timeout) — VPN full-tunnel
 Symptom: `tailscale ping` to the node works, but TCP to its port (22/9898/…) times

@@ -264,7 +264,7 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .ob-docs:hover{color:var(--accent)}
 .modal{position:fixed;inset:0;background:rgba(5,9,14,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modal[hidden]{display:none}
-.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;width:min(520px,96vw);box-shadow:var(--shadow)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;width:min(520px,96vw);box-shadow:var(--shadow);max-height:92vh;overflow:auto}
 .box h3{margin:0 0 18px;font-weight:700;font-size:17px}
 .row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
 .row label{font-size:12px;color:var(--muted);font-weight:600}
@@ -301,7 +301,8 @@ JS = """
         obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
-        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH",provname:"Имя узла"},
+        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль SSH (необязательно)",provbtn:"Провизжинить по SSH",provname:"Имя узла",
+        keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ",
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
         tags:"tags",online_for:"online for",offline_for:"down for",os_up:"os uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
@@ -314,7 +315,8 @@ JS = """
         obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
-        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo):",provpass:"SSH password",provbtn:"Provision by SSH",provname:"Node name"}
+        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"SSH password (optional)",provbtn:"Provision by SSH",provname:"Node name",
+        keyhint:"…or add the hub public key to the new machine (authorized_keys, or the «SSH public key» field when creating a LXC/VM):",keycopy:"Copy key"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
   function humanize(sec){sec=Math.max(0,sec|0);if(sec<60)return sec+'s';if(sec<3600)return Math.floor(sec/60)+'m';if(sec<86400)return Math.floor(sec/3600)+'h';return Math.floor(sec/86400)+'d';}
@@ -392,6 +394,7 @@ JS = """
     var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
     var jg=e.target.closest('#jgen'); if(jg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
     var jcp=e.target.closest('#jcopy'); if(jcp){var t=(document.getElementById('joincmd').textContent||'').trim();if(!t){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(t).then(function(){toast(I18N[cur()].copied);});return;}
+    var kc=e.target.closest('#keycopy'); if(kc){var k=(document.getElementById('hubkey').textContent||'').trim();navigator.clipboard.writeText(k).then(function(){toast(I18N[cur()].copied);});return;}
     var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';var pn=(document.getElementById('p-name').value||'').trim();var pe=document.getElementById('p-engine').value||'';if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw,name:pn,engine:pe},function(){toast(I18N[cur()].applying);});return;}
     var ed=e.target.closest('[data-edit]'); if(ed){ var c=ed.closest('.card');
       openModal({name:c.getAttribute('data-name'),ip:c.getAttribute('data-ip'),port:c.getAttribute('data-port'),
@@ -432,6 +435,7 @@ def render(data, statuses, ts):
             invite_cmd = fh.read().strip()
     except Exception:
         invite_cmd = ""
+    provision_pubkey = data.get("provision_pubkey", "")
     locs = []
     for e in envs:
         loc = e.get("location", "") or "—"
@@ -519,6 +523,11 @@ def render(data, statuses, ts):
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
         <input id="q" type="text" data-i18n-ph="filter" placeholder="Фильтр: имя, место, тег… (клавиша /)">
       </div>""" if envs else '')
+    key_block = (f"""<div class="prov">
+    <p class="hint" data-i18n="keyhint">…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):</p>
+    <pre id="hubkey" class="joincmd">{esc(provision_pubkey)}</pre>
+    <div class="modalactions"><button id="keycopy" class="mini" data-i18n="keycopy">Копировать ключ</button></div>
+  </div>""" if provision_pubkey else '')
     return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="{FAVICON}">
@@ -574,8 +583,9 @@ def render(data, statuses, ts):
     <button id="jcopy" class="open" data-i18n="jcopy">Копировать</button>
     <button id="jclose" class="mini" data-i18n="cancel">Закрыть</button>
   </div>
+  {key_block}
   <div class="prov">
-    <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба, root или passwordless-sudo):</p>
+    <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба, root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):</p>
     <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10"></div>
     <div class="row"><label>ssh user</label><input id="p-user" placeholder="root"></div>
     <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="off"></div>

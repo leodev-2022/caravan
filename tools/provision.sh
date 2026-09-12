@@ -31,8 +31,8 @@ Usage: sudo bash provision.sh --host IP --user USER [--key FILE | --password PW]
 
   --host IP        target machine (reachable from the hub)
   --user USER      SSH user (root, or a user with passwordless sudo)
-  --key FILE       SSH private key
-  --password PW    SSH password (requires sshpass)
+  --key FILE       SSH private key (default: the hub key, $CARAVAN_DIR/.ssh/id_ed25519)
+  --password PW    SSH password (requires sshpass; often disabled on LXC)
   --name NAME      node name (default: host with dots -> dashes)
   --engine NAME    codenomad (default) or opencode
   --dir DIR        hub directory (default: /opt/caravan)
@@ -60,6 +60,11 @@ require_root
 [ -n "$USER" ] || die "--user is required"
 # prefer the env var (keeps the password out of process args)
 [ -n "$PASSWORD" ] || PASSWORD="${PROVISION_PASSWORD:-}"
+# no key/password given? fall back to the hub's provisioning key, whose public
+# half the portal shows (paste it into the target's authorized_keys).
+if [ -z "$KEY" ] && [ -z "$PASSWORD" ] && [ -f "$CARAVAN_DIR/.ssh/id_ed25519" ]; then
+  KEY="$CARAVAN_DIR/.ssh/id_ed25519"
+fi
 
 domain="$(grep -m1 '^DOMAIN=' "$CARAVAN_DIR/caravan.env" 2>/dev/null | cut -d= -f2 || true)"
 [ -n "$domain" ] || domain="$(python3 -c "import sys,yaml;print((yaml.safe_load(open(sys.argv[1])) or {}).get('domain',''))" "$CARAVAN_DIR/nodes.yaml" 2>/dev/null || true)"
@@ -72,7 +77,7 @@ elif [ -n "$PASSWORD" ]; then
   have sshpass || die "sshpass not found (needed for --password); use --key instead"
   SSH=(sshpass -p "$PASSWORD" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no "${SSH_OPTS[@]}")
 else
-  die "provide --key FILE or --password PW"
+  die "no SSH auth: add the hub key to the target (portal shows it), or pass --key/--password"
 fi
 
 if [ "$USER" = "root" ]; then

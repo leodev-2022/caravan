@@ -35,9 +35,7 @@ def handle_provision(base, req):
         env["PROVISION_PASSWORD"] = str(req["password"])
     elif req.get("key"):
         args += ["--key", str(req["key"])]
-    else:
-        print("[apply] provision: password or key required")
-        return
+    # else: provision.sh falls back to the hub's provisioning key
     try:
         r = subprocess.run(args, capture_output=True, text=True, timeout=1800, env=env)
         for line in (r.stdout or "").strip().splitlines()[-6:]:

@@ -61,15 +61,15 @@ trusted HTTPS. Behind NAT (a home/lab box) it auto-falls back to a self-signed
 cert — the browser will warn (pass `--domain example.com` for trusted TLS). It
 prints the dashboard URL and a one-time admin password.
 
-### 2. A machine (node)
-On the hub, get a ready-to-paste invite:
-```bash
-sudo caravan token --expiry 1h
-```
-It prints **one command** — paste it on the new machine (no flags to learn):
+### 2. Connect a machine (node)
+
+**Option A — one command (works everywhere, no SSH needed).**
+In the dashboard click **Invite → Generate** and copy the one line; run it on the
+new machine as root:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh | sudo bash -s -- --hub https://mesh.example.com --token <key>
 ```
+(`sudo caravan token --expiry 1h` prints the same command from the CLI.)
 
 **Windows node** (Windows 10/11) — run PowerShell **as Administrator**:
 ```powershell
@@ -79,11 +79,29 @@ curl.exe -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/
 It installs Node.js + the engine + Tailscale (direct downloads — no winget) and
 registers both as Scheduled Tasks. Use the same `<key>` from `caravan token`.
 
+**Option B — “magic”: provision over SSH from the dashboard.**
+Open **Invite** and use the **Provision by SSH** form (host, ssh user, node name).
+The hub logs in and sets everything up for you.
+- A typical VPS with a root password: just enter the password.
+- **Fresh Proxmox LXC/VM:** root has *no password* and sshd uses
+  `PermitRootLogin prohibit-password`, so password login always fails. Add the
+  hub's **public key** (shown in the same **Invite** dialog) to the machine and
+  leave the password blank. Paste it into the PVE creation wizard's
+  **“SSH public key”** field, or afterwards:
+  ```
+  pct enter <VMID>
+  mkdir -p /root/.ssh
+  echo "<HUB PUBLIC KEY>" >> /root/.ssh/authorized_keys
+  chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys
+  ```
+  Then click **Provision by SSH** with the password field empty.
+
 ### 3. Register the node
+**Provision by SSH** registers the node for you. For the one-command join, register
+the mesh IP it prints at the end (or click **+ Add** in the dashboard):
 ```bash
 sudo caravan add-node --name web1 --ip <mesh-ip> --port 9898
 ```
-…or click **+ Add** in the dashboard.
 
 ## CLI
 ```
@@ -102,7 +120,9 @@ caravan uninstall [--purge]
 - **Hub:** any Ubuntu/Debian VPS; a public IP for ACME — or use `--sslip` /
   `--self-signed`. Runs comfortably on 1 vCPU / 2 GB.
 - **Nodes:** Ubuntu/Debian, or Windows 10/11 (PowerShell). No public IP and no
-  inbound ports required.
+  inbound ports required. For **dashboard provisioning** the hub must reach the
+  machine over SSH: a root password, or (for Proxmox LXC/VM, where root has no
+  password by default) the hub's public key in `authorized_keys`.
 
 ## Documentation
 - [Architecture](docs/architecture.md)
