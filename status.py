@@ -328,7 +328,7 @@ JS = """
         obs2:"Зарегистрируйте машину в портале",obs2d:"В конце установки машина покажет свой mesh-IP — нажмите «Добавить» и вставьте его.",
         obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
-        bar_run:"идёт",bar_ok:"готово",bar_err:"ошибка",
+        bar_run:"идёт",bar_ok:"готово",bar_err:"ошибка",errssh:"нет SSH-доступа к машине — проще скопировать команду выше и выполнить её в консоли машины",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Скопируйте команду и выполните её на новой машине — она появится здесь сама.",jgenerate:"Новая команда",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",jwhere:"Linux/VM — вставьте в терминале. Proxmox LXC — на хосте pct enter <VMID>, затем вставьте.",advsum:"Дополнительно: пользователь и имя",obcopy:"Скопировать команду",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль root",provbtn:"Подключить",provname:"Имя узла",magictitle:"Магия: подключить по SSH",magichint:"Хаб сам всё поставит и зарегистрирует, если у машины есть пароль root (обычные VPS/VM). Для Proxmox LXC — используйте команду выше.",magicbtn:"Подключить",
         keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ"},
@@ -343,7 +343,7 @@ JS = """
         obs2:"Register the machine in the portal",obs2d:"At the end the machine prints its mesh IP — click Add and paste it.",
         obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
-        bar_run:"in progress",bar_ok:"done",bar_err:"error",
+        bar_run:"in progress",bar_ok:"done",bar_err:"error",errssh:"no SSH access to the machine — easier to copy the command above and run it in the machine's console",
         join:"Invite",jointitle:"Join a machine",joinhint:"Copy the command and run it on the new machine — it will show up here by itself.",jgenerate:"New command",jcopy:"Copy",joinempty:"Generate an invite first",jwhere:"Linux/VM — paste it in a terminal. Proxmox LXC — on the host run pct enter <VMID>, then paste.",advsum:"Advanced: user and name",obcopy:"Copy command",
         provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"root password",provbtn:"Connect",provname:"Node name",magictitle:"Magic: connect over SSH",magichint:"The hub installs and registers everything if the machine has a root password (typical VPS/VM). For a Proxmox LXC use the command above.",magicbtn:"Connect",
         keyhint:"…or add the hub public key to the new machine (authorized_keys, or the «SSH public key» field when creating a LXC/VM):",keycopy:"Copy key"}
@@ -399,7 +399,7 @@ JS = """
     var ab=document.getElementById('applybar');
     if(ab){var ap=d.apply||{};var as=ap.status||'';
       if(as==='running'){ab.hidden=false;ab.className='applybar run';ab.textContent='\u23f3 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_run+' \u00b7 '+humanize(Date.now()/1000-(ap.started||Date.now()/1000));}
-      else if(as==='error'){ab.hidden=false;ab.className='applybar err';ab.textContent='\u26a0 '+(ap.name?ap.name+': ':'')+(ap.message||I18N[cur()].bar_err);}
+      else if(as==='error'){ab.hidden=false;ab.className='applybar err';var m=ap.message||I18N[cur()].bar_err;if(/denied|\u043e\u0442\u043a\u0430\u0437/i.test(m))m=m+' \u2014 '+I18N[cur()].errssh;ab.textContent='\u26a0 '+(ap.name?ap.name+': ':'')+m;}
       else if(as==='ok'&&ap.finished&&(Date.now()/1000-ap.finished)<180){ab.hidden=false;ab.className='applybar ok';ab.textContent='\u2713 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_ok;}
       else{ab.hidden=true;}
     }
