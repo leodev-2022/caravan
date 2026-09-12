@@ -97,6 +97,13 @@ fi
 token="$(bash "$CARAVAN_DIR/tools/invite.sh" --token-only --dir "$CARAVAN_DIR" | tail -n1)"
 [ -n "$token" ] || die "could not mint a join token"
 
+# name the node after the machine's own hostname unless one was given (a bare
+# IP-name would be ugly and could duplicate an existing node)
+if [ -z "$NAME" ]; then
+  NAME="$("${SSH[@]}" "$USER@$HOST" 'hostname' 2>/dev/null | tr -d '\r' | head -n1)"
+  [ -n "$NAME" ] || NAME="$(printf '%s' "$HOST" | tr '.' '-')"
+fi
+
 JOIN_ARGS="--hub $MESH --token $token"
 if [ -n "$NAME" ]; then JOIN_ARGS="$JOIN_ARGS --name $NAME"; fi
 if [ -n "$ENGINE" ]; then JOIN_ARGS="$JOIN_ARGS --engine $ENGINE"; fi
@@ -128,9 +135,8 @@ printf '%s\n' "$out" | tail -n 6
 ip="$(printf '%s\n' "$out" | sed -n 's/.*mesh-ip=\([0-9.]*\).*/\1/p' | tail -n1)"
 port="$(printf '%s\n' "$out" | sed -n 's/.*port=\([0-9]*\).*/\1/p' | tail -n1)"
 if [ -n "$ip" ]; then
-  reg_name="${NAME:-$(printf '%s' "$HOST" | tr '.' '-')}"
-  log "registering $reg_name ($ip:${port:-9898})"
-  bash "$CARAVAN_DIR/tools/add-node.sh" --name "$reg_name" --ip "$ip" --port "${port:-9898}" --dir "$CARAVAN_DIR"
+  log "registering $NAME ($ip:${port:-9898})"
+  bash "$CARAVAN_DIR/tools/add-node.sh" --name "$NAME" --ip "$ip" --port "${port:-9898}" --dir "$CARAVAN_DIR"
 else
   warn "could not detect the mesh IP; register the node manually"
 fi
