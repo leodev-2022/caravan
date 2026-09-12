@@ -45,6 +45,7 @@ HUB (a cheap always-on VPS)
    ├─ caddy      TLS/ACME + forward_auth + reverse proxy
    ├─ authelia   SSO + TOTP
    ├─ headscale  self-hosted mesh coordinator (SQLite)
+   ├─ tailscale  the hub joins its own mesh (reaches nodes + proxies)
    └─ portal     status dashboard + Telegram alerts
    │  each node dials OUT — no inbound ports on your machines
    ▼

@@ -211,6 +211,56 @@ install_provision_key() {
   chmod 644 "$d/id_ed25519.pub" 2>/dev/null || true
 }
 
+join_hub_mesh() {
+  # The hub must be on its own mesh: the portal checks node mesh IPs and Caddy
+  # reverse-proxies to them, so without this every node would show offline.
+  if have tailscale && tailscale status >/dev/null 2>&1; then
+    log "hub is already on the mesh"
+    return 0
+  fi
+  if ! have tailscale; then
+    log "installing tailscale on the hub (so it can reach nodes)"
+    retry curl -fsSL "https://pkgs.tailscale.com/stable/${OS_ID}/${OS_CODENAME}.noarmor.gpg" \
+      -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+    retry curl -fsSL "https://pkgs.tailscale.com/stable/${OS_ID}/${OS_CODENAME}.tailscale-keyring.list" \
+      -o /etc/apt/sources.list.d/tailscale.list
+    apt-get update -qq || warn "apt-get update reported errors; continuing"
+    apt-get install -y -qq tailscale >/dev/null
+  fi
+  if [ "$TLS_MODE" = internal ]; then
+    # trust Caddy's local CA so tailscale can reach the self-signed control server
+    if docker cp caddy:/data/caddy/pki/authorities/local/root.crt \
+      /usr/local/share/ca-certificates/caravan-hub.crt >/dev/null 2>&1; then
+      update-ca-certificates >/dev/null 2>&1 || true
+    fi
+  fi
+  systemctl restart tailscaled 2>/dev/null || true
+  sleep 2
+  local users uid key
+  users="$(docker exec headscale headscale users list -o json 2>/dev/null || echo '[]')"
+  uid="$(printf '%s' "$users" | python3 -c 'import json,sys;u=json.load(sys.stdin);print(u[0]["id"] if u else "")')"
+  if [ -z "$uid" ]; then
+    docker exec headscale headscale users create caravan >/dev/null 2>&1 || true
+    users="$(docker exec headscale headscale users list -o json 2>/dev/null || echo '[]')"
+    uid="$(printf '%s' "$users" | python3 -c 'import json,sys;print(json.load(sys.stdin)[0]["id"])')"
+  fi
+  key="$(docker exec headscale headscale preauthkeys create --user "$uid" \
+    --reusable --expiration 1h 2>/dev/null | tail -n1)"
+  if [ -z "$key" ]; then
+    warn "could not mint a mesh key — the hub stays off the mesh (nodes show offline)"
+    return 0
+  fi
+  tailscale up --login-server="https://mesh.${DOMAIN}" --authkey="$key" \
+    --hostname=caravan-hub --accept-dns=false >/dev/null 2>&1 ||
+    warn "hub failed to join the mesh"
+  sleep 3
+  if tailscale ip -4 >/dev/null 2>&1; then
+    log "hub joined the mesh ($(tailscale ip -4 | head -n1))"
+  else
+    warn "hub is not on the mesh — nodes will show offline until it is"
+  fi
+}
+
 write_env() {
   local envf="$CARAVAN_DIR/.env"
   if [ -f "$envf" ]; then
@@ -431,6 +481,7 @@ main() {
   install_units
   [ "$UPDATE" = 1 ] && pull_images
   start_stack
+  join_hub_mesh
   register_admin_totp
   print_summary
   log "stage done: docker + compose + secrets + .env + stack + configs (tls=$TLS_MODE)"

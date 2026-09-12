@@ -124,8 +124,15 @@ stack, restores configs and volumes, then starts it again.
 is intentionally NOT behind SSO, so node joins keep working.
 
 ## Troubleshooting
-- **Node shows offline** → check `tailscale status` on the hub; confirm the
-  backend answers `curl http://<mesh-ip>:9898/`.
+- **Every node shows offline** → the hub itself may be off the mesh. `install.sh`
+  joins the hub as `caravan-hub`; verify with `tailscale status` on the hub (it
+  should list its own node). If it was skipped, re-run the installer or join by hand:
+  ```bash
+  tailscale up --login-server https://mesh.<DOMAIN> --authkey <key> --accept-dns=false
+  ```
+  Then `curl http://<mesh-ip>:9898/` from the hub should answer.
+- **A single node shows offline** → check `tailscale status` and confirm the
+  backend answers `curl http://<mesh-ip>:9898/` from the hub.
 - **Service won't start on a node** → `203/EXEC` usually means wrong npm-global
   path; node-join.sh now auto-detects it, or fix the unit's `ExecStart`/`PATH`.
 - **Dashboard provisioning fails with «Permission denied» on a container** → the
