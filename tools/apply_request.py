@@ -50,30 +50,66 @@ def _apply_status(**kw):
         pass
 
 
-def handle_provision(base, req, on_progress=None):
-    """Provision a reachable machine over SSH. Returns (ok, short_message).
-
-    `on_progress(text)` is called for each meaningful stage line so the portal
-    can show live progress while the (long) provisioning runs.
-    """
+def _provision_args(base, req):
+    """Build the provision.sh argv + env for a request. Returns (args, env, err)."""
     script = os.path.join(base, "tools", "provision.sh")
     if not os.path.exists(script):
-        return False, "tools/provision.sh not found"
+        return None, None, "tools/provision.sh not found"
     host = str(req.get("host", "")).strip()
-    user = str(req.get("user", "")).strip()
-    if not host or not user:
-        return False, "host & user required"
+    user = str(req.get("user", "")).strip() or "root"
+    if not host:
+        return None, None, "host required"
     args = ["bash", script, "--dir", base, "--host", host, "--user", user]
-    if req.get("name"):
-        args += ["--name", str(req["name"])]
-    if req.get("engine"):
-        args += ["--engine", str(req["engine"])]
     env = dict(os.environ)
     if req.get("password"):
         env["PROVISION_PASSWORD"] = str(req["password"])
     elif req.get("key"):
         args += ["--key", str(req["key"])]
     # else: provision.sh falls back to the hub's provisioning key
+    return args, env, ""
+
+
+def handle_stt_check(base, req):
+    """Check the target's resources for STT. Returns (ok, message, extra)."""
+    args, env, err = _provision_args(base, req)
+    if err:
+        return False, err, {}
+    args.append("--check")
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=120, env=env)
+        out = ANSI.sub("", r.stdout or "")
+        model = verdict = ""
+        for ln in out.splitlines():
+            if "recommendation:" in ln and "model=" in ln and "->" in ln:
+                model = ln.split("model=", 1)[1].split()[0]
+                verdict = ln.split("->", 1)[1].strip()
+        if not verdict:
+            tail = [x for x in out.strip().splitlines() if x.strip()]
+            return False, (tail[-1] if tail else "resource check failed")[:200], {}
+        safe = verdict.startswith("recommended") or verdict.startswith("strongly")
+        print(f"[apply] stt-check: {model} -> {verdict}")
+        return True, f"{model} · {verdict}", {"stt_model": model, "stt_verdict": verdict,
+                                              "stt_safe": safe}
+    except Exception as e:
+        print("[apply] stt-check error:", e)
+        return False, str(e)[:200], {}
+
+
+def handle_provision(base, req, on_progress=None):
+    """Provision a reachable machine over SSH. Returns (ok, short_message).
+
+    `on_progress(text)` is called for each meaningful stage line so the portal
+    can show live progress while the (long) provisioning runs.
+    """
+    args, env, err = _provision_args(base, req)
+    if err:
+        return False, err
+    if req.get("name"):
+        args += ["--name", str(req["name"])]
+    if req.get("engine"):
+        args += ["--engine", str(req["engine"])]
+    if req.get("stt"):
+        args.append("--stt")
     try:
         proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, env=env, bufsize=1)
@@ -173,7 +209,7 @@ def main():
                  or req.get("host") or "")
         started = time.time()
         _apply_status(status="running", action=action, name=label, started=started)
-        ok, msg = True, ""
+        ok, msg, extra = True, "", {}
         if action == "invite":
             handle_invite(BASE, REQ)
         elif action == "provision":
@@ -182,6 +218,8 @@ def main():
                               message=text, started=_started)
 
             ok, msg = handle_provision(BASE, req, _progress)
+        elif action == "stt-check":
+            ok, msg, extra = handle_stt_check(BASE, req)
         else:
             envs, ch = apply_one(envs, req)
             if ch:
@@ -195,7 +233,7 @@ def main():
             # the provision registers under the machine's hostname — show that name
             final_name = msg.split("nodes.yaml:", 1)[1].split("->", 1)[0].strip() or label
         _apply_status(status=("ok" if ok else "error"), action=action, name=final_name,
-                      message=msg, finished=time.time())
+                      message=msg, finished=time.time(), **extra)
     if changed:
         data["envs"] = envs
         save(data)

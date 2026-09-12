@@ -284,6 +284,11 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .magic{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 .magic-h{font-size:14px;margin-bottom:4px}
 .magic-h .spark{color:var(--accent)}
+.sttbox{padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12.5px;margin:2px 0 10px;line-height:1.45}
+.sttbox.ok{border-color:var(--ok)}
+.sttbox.warn{border-color:var(--warn)}
+.sttbox.risk{border-color:var(--down);color:var(--down)}
+.sttopt{display:flex;gap:8px;align-items:center;font-size:13px;margin:2px 0 10px;cursor:pointer}
 details.adv{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
 details.adv>summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
 details.adv>summary:hover{color:var(--accent)}
@@ -332,7 +337,7 @@ JS = """
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         bar_run:"идёт",bar_ok:"готово",bar_err:"ошибка",errssh:"нет SSH-доступа к машине — проще скопировать команду выше и выполнить её в консоли машины",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Скопируйте команду и выполните её на новой машине — она появится здесь сама.",jgenerate:"Новая команда",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",jwhere:"Linux/VM — вставьте в терминале. Proxmox LXC — на хосте pct enter <VMID>, затем вставьте.",advsum:"Дополнительно: пользователь и имя",obcopy:"Скопировать команду",
-        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль root",provbtn:"Подключить",provname:"Имя узла",magictitle:"Магия: подключить по SSH",magichint:"Хаб сам всё поставит и зарегистрирует, если у машины есть пароль root (обычные VPS/VM). Для Proxmox LXC — используйте команду выше.",magicbtn:"Подключить",
+        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль root",provbtn:"Подключить",provname:"Имя узла",magictitle:"Магия: подключить по SSH",magichint:"Хаб сам всё поставит и зарегистрирует, если у машины есть пароль root (обычные VPS/VM). Для Proxmox LXC — используйте команду выше.",magicbtn:"Подключить",sttcheck:"Проверить машину",sttinstall:"Установить голос (STT)",sttsafe:"рекомендуется",sttrisk:"на свой страх и риск (может тормозить машину)",sttneed:"сначала нажмите «Проверить машину»",sttchecking:"проверяю ресурсы",
         keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
@@ -347,7 +352,7 @@ JS = """
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
         bar_run:"in progress",bar_ok:"done",bar_err:"error",errssh:"no SSH access to the machine — easier to copy the command above and run it in the machine's console",
         join:"Invite",jointitle:"Join a machine",joinhint:"Copy the command and run it on the new machine — it will show up here by itself.",jgenerate:"New command",jcopy:"Copy",joinempty:"Generate an invite first",jwhere:"Linux/VM — paste it in a terminal. Proxmox LXC — on the host run pct enter <VMID>, then paste.",advsum:"Advanced: user and name",obcopy:"Copy command",
-        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"root password",provbtn:"Connect",provname:"Node name",magictitle:"Magic: connect over SSH",magichint:"The hub installs and registers everything if the machine has a root password (typical VPS/VM). For a Proxmox LXC use the command above.",magicbtn:"Connect",
+        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"root password",provbtn:"Connect",provname:"Node name",magictitle:"Magic: connect over SSH",magichint:"The hub installs and registers everything if the machine has a root password (typical VPS/VM). For a Proxmox LXC use the command above.",magicbtn:"Connect",sttcheck:"Check the machine",sttinstall:"Install voice (STT)",sttsafe:"recommended",sttrisk:"at your own risk (may slow the machine)",sttneed:"click “Check the machine” first",sttchecking:"checking resources",
         keyhint:"…or add the hub public key to the new machine (authorized_keys, or the «SSH public key» field when creating a LXC/VM):",keycopy:"Copy key"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
@@ -401,12 +406,18 @@ JS = """
     var ab=document.getElementById('applybar');
     if(ab){var ap=d.apply||{};var as=ap.status||'';
       var fin=ap.finished||0;var age=fin?(Date.now()/1000-fin):0;
+      var aact=ap.action||'';
       ab.setAttribute('data-fin',String(fin));
-      if(fin&&localStorage.getItem('cn_apply_ack')===String(fin)){ab.hidden=true;}
+      if(aact==='stt-check'){ab.hidden=true;}
+      else if(fin&&localStorage.getItem('cn_apply_ack')===String(fin)){ab.hidden=true;}
       else if(as==='running'){ab.hidden=false;ab.className='applybar run';ab.textContent='\u23f3 '+(ap.name||'')+' \u2014 '+(ap.message||I18N[cur()].bar_run)+' \u00b7 '+humanize(Date.now()/1000-(ap.started||Date.now()/1000));}
       else if(as==='error'&&age<600){ab.hidden=false;ab.className='applybar err';var m=ap.message||I18N[cur()].bar_err;if(/denied|\u043e\u0442\u043a\u0430\u0437/i.test(m))m=m+' \u2014 '+I18N[cur()].errssh;ab.textContent='\u26a0 '+(ap.name?ap.name+': ':'')+m+'  (\u00d7)';}
       else if(as==='ok'&&age<180){ab.hidden=false;ab.className='applybar ok';ab.textContent='\u2713 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_ok;}
       else{ab.hidden=true;}
+      if(aact==='stt-check'&&fin&&age<300){var rb=document.getElementById('sttresult');
+        if(rb){rb.hidden=false;var safe=ap.stt_safe===true;rb.className='sttbox '+(safe?'ok':'risk');
+          rb.textContent=(safe?'\u2713 ':'\u26a0 ')+(ap.stt_model||'')+' \u2014 '+(ap.stt_verdict||'')+(safe?'':'. '+I18N[cur()].sttrisk);
+          var cb=document.getElementById('p-stt');if(cb&&safe)cb.checked=true;}}
     }
     var el=document.getElementById('utime');
     if(el) el.textContent=new Date((d.ts||Date.now()/1000)*1000).toLocaleTimeString();
@@ -444,7 +455,8 @@ JS = """
     var jg=e.target.closest('#jgen'); if(jg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
     var jcp=e.target.closest('#jcopy'); if(jcp){var t=(document.getElementById('joincmd').textContent||'').trim();if(!t){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(t).then(function(){toast(I18N[cur()].copied);});return;}
     var kc=e.target.closest('#keycopy'); if(kc){var k=(document.getElementById('hubkey').textContent||'').trim();navigator.clipboard.writeText(k).then(function(){toast(I18N[cur()].copied);});return;}
-    var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';var pn=(document.getElementById('p-name').value||'').trim();var pe=document.getElementById('p-engine').value||'';if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw,name:pn,engine:pe},function(){toast(I18N[cur()].applying);});return;}
+    var chk=e.target.closest('#pcheck'); if(chk){var ch=(document.getElementById('p-host').value||'').trim();var cu=(document.getElementById('p-user').value||'root').trim();var cpw=document.getElementById('p-pass').value||'';if(!ch){alert('host required');return;}var rb=document.getElementById('sttresult');rb.hidden=false;rb.className='sttbox';rb.textContent=I18N[cur()].sttchecking+'\u2026';post({action:'stt-check',host:ch,user:cu,password:cpw},function(){});return;}
+    var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';var pn=(document.getElementById('p-name').value||'').trim();var pe=document.getElementById('p-engine').value||'';var pstt=!!(document.getElementById('p-stt')&&document.getElementById('p-stt').checked);if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw,name:pn,engine:pe,stt:pstt},function(){toast(I18N[cur()].applying);});return;}
     var ed=e.target.closest('[data-edit]'); if(ed){ var c=ed.closest('.card');
       openModal({name:c.getAttribute('data-name'),ip:c.getAttribute('data-ip'),port:c.getAttribute('data-port'),
         label:c.getAttribute('data-label'),location:c.getAttribute('data-location'),engine:c.getAttribute('data-engine'),
@@ -654,8 +666,11 @@ def render(data, statuses, ts):
     </div>
     <div class="grid2">
       <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
-      <div class="row" style="justify-content:flex-end"><button id="pprov" class="open" data-i18n="magicbtn">Подключить</button></div>
+      <div class="row" style="justify-content:flex-end"><button id="pcheck" class="mini" data-i18n="sttcheck">Проверить машину</button></div>
     </div>
+    <div id="sttresult" class="sttbox" hidden></div>
+    <label class="sttopt"><input type="checkbox" id="p-stt"> <span data-i18n="sttinstall">Установить голос (STT)</span></label>
+    <div class="row" style="justify-content:flex-end"><button id="pprov" class="open" data-i18n="magicbtn">Подключить</button></div>
     <details class="adv">
       <summary data-i18n="advsum">Дополнительно: пользователь и имя</summary>
       {key_block}

@@ -375,18 +375,19 @@ stt_recommend() {
   detect_resources
   local cpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cpu"
   local gpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cuda"
+  REC_SAFE=0
   if [ -n "$GPU" ]; then
-    REC_MODEL="large-v3"; REC_IMAGE="$gpu_img"; REC_VERDICT="strongly recommended (GPU)"
+    REC_MODEL="large-v3"; REC_IMAGE="$gpu_img"; REC_VERDICT="strongly recommended (GPU)"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 24000 ]; then
-    REC_MODEL="large-v3"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended"
+    REC_MODEL="large-v3"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 12000 ]; then
-    REC_MODEL="medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended"
+    REC_MODEL="medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 8000 ]; then
-    REC_MODEL="small"; REC_IMAGE="$cpu_img"; REC_VERDICT="ok"
+    REC_MODEL="small"; REC_IMAGE="$cpu_img"; REC_VERDICT="ok (may compete with your work)"
   elif [ "$RAM_MB" -ge 4000 ]; then
-    REC_MODEL="base"; REC_IMAGE="$cpu_img"; REC_VERDICT="marginal (may be tight)"
+    REC_MODEL="base"; REC_IMAGE="$cpu_img"; REC_VERDICT="tight for this machine"
   else
-    REC_MODEL="tiny"; REC_IMAGE="$cpu_img"; REC_VERDICT="NOT recommended (low RAM)"
+    REC_MODEL="tiny"; REC_IMAGE="$cpu_img"; REC_VERDICT="not enough RAM"
   fi
 }
 
@@ -442,9 +443,8 @@ setup_stt() {
   [ "$STT_CPU" = 1 ] && image="ghcr.io/speaches-ai/speaches:0.8.3-cpu"
   [ "$STT_GPU" = 1 ] && image="ghcr.io/speaches-ai/speaches:0.8.3-cuda"
   if [ -z "$STT_MODEL" ] && stt_underpowered; then
-    warn "STT is NOT recommended on this machine (RAM=$((RAM_MB / 1024))GB, no GPU) — skipping."
-    warn "To force it anyway: --stt-model tiny (or another model)."
-    return 0
+    printf '\033[1;31m[caravan] WARNING: this machine (RAM %sGB, no GPU) is tight for STT — continuing at your OWN RISK.\033[0m\n' \
+      "$((RAM_MB / 1024))" >&2
   fi
   if [ -n "$STT_MODEL" ] && [ "$model" != "$REC_MODEL" ]; then
     log "STT: using explicitly requested model=$model (recommendation was $REC_MODEL)"
@@ -472,23 +472,27 @@ setup_stt() {
 }
 
 maybe_offer_stt() {
-  # Offer voice-to-text on machines with the resources for it. Non-interactive
-  # runs (no TTY / CARAVAN_YES=1) only get a hint, never a blocked prompt.
+  # Offer voice-to-text: honest about resources, and the choice is always the
+  # user's. Non-interactive runs (no TTY / CARAVAN_YES=1) only get a hint.
   stt_recommend
-  case "$REC_VERDICT" in
-    "strongly recommended (GPU)" | recommended) : ;;
-    *) return 0 ;;
-  esac
   local ram=$((RAM_MB / 1024))
   if [ -r /dev/tty ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
-    printf '[caravan] this machine (RAM %sGB%s) can run local speech-to-text (model: %s).\n' \
-      "$ram" "${GPU:+, GPU}" "$REC_MODEL" >&2
-    printf '[caravan] install voice-to-text? (installs Docker + the model, a few GB) [y/N] ' >&2
+    if [ "$REC_SAFE" = 1 ]; then
+      printf '[caravan] this machine (RAM %sGB%s) can run local speech-to-text.\n' \
+        "$ram" "${GPU:+, GPU}" >&2
+      printf '[caravan] install voice-to-text? (Docker + model %s, a few GB) [y/N] ' "$REC_MODEL" >&2
+    else
+      printf '\033[1;31m[caravan] WARNING: this machine (RAM %sGB%s) is tight for speech-to-text.\n' \
+        "$ram" "${GPU:+, GPU}" >&2
+      printf '[caravan] it competes for RAM/CPU and can slow your work — install at your OWN RISK.\n' >&2
+      printf '[caravan] suggested model: %s (%s). install anyway? [y/N]\033[0m ' "$REC_MODEL" "$REC_VERDICT" >&2
+    fi
     local ans=""
     read -r ans < /dev/tty || ans=""
     case "$ans" in y | Y | yes | YES) setup_stt ;; *) log "skipping voice-to-text" ;; esac
   else
-    log "voice-to-text is available on this machine — re-run with --stt to install ($REC_MODEL)"
+    [ "$REC_SAFE" = 1 ] &&
+      log "voice-to-text is available on this machine — re-run with --stt to install ($REC_MODEL)"
   fi
 }
 

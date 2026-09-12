@@ -22,6 +22,8 @@ PASSWORD=""
 NAME=""
 ENGINE=""
 DRY=0
+CHECK=0
+STT=0
 
 usage() {
   cat <<'EOF'
@@ -33,8 +35,10 @@ Usage: sudo bash provision.sh --host IP --user USER [--key FILE | --password PW]
   --user USER      SSH user (root, or a user with passwordless sudo)
   --key FILE       SSH private key (default: the hub key, $CARAVAN_DIR/.ssh/id_ed25519)
   --password PW    SSH password (requires sshpass; often disabled on LXC)
-  --name NAME      node name (default: host with dots -> dashes)
+  --name NAME      node name (default: the machine's hostname)
   --engine NAME    codenomad (default) or opencode
+  --stt            also install local speech-to-text on the target
+  --check          only check the target's resources for STT, then exit
   --dir DIR        hub directory (default: /opt/caravan)
   --dry-run        only check SSH connectivity, then exit
 EOF
@@ -50,6 +54,8 @@ while [ $# -gt 0 ]; do
     --engine) ENGINE="${2:?--engine needs a value}"; shift 2 ;;
     --dir) CARAVAN_DIR="${2:?--dir needs a value}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
+    --check) CHECK=1; shift ;;
+    --stt) STT=1; shift ;;
     -h | --help) usage; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
   esac
@@ -94,6 +100,30 @@ if [ "$DRY" = 1 ]; then
   exit 0
 fi
 
+JOIN_URL="https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh"
+# Fresh minimal images (e.g. a Proxmox LXC) often have neither curl nor wget,
+# yet the join is fetched with one of them — ensure a downloader first.
+remote_boot=$(cat <<EOF
+set -e
+if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+  ${SUDO}apt-get update -qq >/dev/null 2>&1 || true
+  ${SUDO}apt-get install -y -qq curl >/dev/null 2>&1 || true
+fi
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$JOIN_URL"
+else
+  wget -qO- "$JOIN_URL"
+fi
+EOF
+)
+
+if [ "$CHECK" = 1 ]; then
+  log "checking $USER@$HOST for speech-to-text"
+  # shellcheck disable=SC2029
+  "${SSH[@]}" "$USER@$HOST" "$remote_boot | ${SUDO}bash -s -- --stt-check"
+  exit 0
+fi
+
 token="$(bash "$CARAVAN_DIR/tools/invite.sh" --token-only --dir "$CARAVAN_DIR" | tail -n1)"
 [ -n "$token" ] || die "could not mint a join token"
 
@@ -107,22 +137,8 @@ fi
 JOIN_ARGS="--hub $MESH --token $token"
 if [ -n "$NAME" ]; then JOIN_ARGS="$JOIN_ARGS --name $NAME"; fi
 if [ -n "$ENGINE" ]; then JOIN_ARGS="$JOIN_ARGS --engine $ENGINE"; fi
-JOIN_URL="https://raw.githubusercontent.com/leodev-2022/caravan/main/tools/node-join.sh"
-# Fresh minimal images (e.g. a Proxmox LXC) often have neither curl nor wget,
-# yet the join is fetched with one of them — ensure a downloader first.
-remote=$(cat <<EOF
-set -e
-if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-  ${SUDO}apt-get update -qq >/dev/null 2>&1 || true
-  ${SUDO}apt-get install -y -qq curl >/dev/null 2>&1 || true
-fi
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$JOIN_URL"
-else
-  wget -qO- "$JOIN_URL"
-fi | ${SUDO}bash -s -- $JOIN_ARGS
-EOF
-)
+[ "$STT" = 1 ] && JOIN_ARGS="$JOIN_ARGS --stt"
+remote="$remote_boot | ${SUDO}bash -s -- $JOIN_ARGS"
 
 log "provisioning $USER@$HOST (this can take a few minutes)"
 out_file="$(mktemp)"
