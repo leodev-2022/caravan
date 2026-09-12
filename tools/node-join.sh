@@ -51,8 +51,9 @@ Usage: sudo bash node-join.sh --hub URL --token KEY [options]
   --dry-run            print the plan (engine/port/user) and exit
   --bypass-vpn         route hub/mesh traffic directly when the node full-tunnels
   --hub-ip IP          hub public IP (auto-resolved from --hub when needed)
-  --stt                enable local speech-to-text (speaches) with the model
-                       recommended for this machine's resources
+  --stt                install local speech-to-text (speaches) with the model
+                       recommended for this machine; on capable machines it is
+                       also offered interactively after the join
   --stt-check          print the STT recommendation for this machine and exit
   --stt-model NAME     use an explicit Whisper model (implies --stt)
   --stt-gpu            force the CUDA image (implies --stt)
@@ -470,6 +471,27 @@ setup_stt() {
   log "STT ready on http://127.0.0.1:8000"
 }
 
+maybe_offer_stt() {
+  # Offer voice-to-text on machines with the resources for it. Non-interactive
+  # runs (no TTY / CARAVAN_YES=1) only get a hint, never a blocked prompt.
+  stt_recommend
+  case "$REC_VERDICT" in
+    "strongly recommended (GPU)" | recommended) : ;;
+    *) return 0 ;;
+  esac
+  local ram=$((RAM_MB / 1024))
+  if [ -r /dev/tty ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
+    printf '[caravan] this machine (RAM %sGB%s) can run local speech-to-text (model: %s).\n' \
+      "$ram" "${GPU:+, GPU}" "$REC_MODEL" >&2
+    printf '[caravan] install voice-to-text? (installs Docker + the model, a few GB) [y/N] ' >&2
+    local ans=""
+    read -r ans < /dev/tty || ans=""
+    case "$ans" in y | Y | yes | YES) setup_stt ;; *) log "skipping voice-to-text" ;; esac
+  else
+    log "voice-to-text is available on this machine — re-run with --stt to install ($REC_MODEL)"
+  fi
+}
+
 remove_awg_bypass() {
   local awg="/etc/amnezia/amneziawg/awg0.conf"
   [ -f "$awg" ] || return 0
@@ -576,7 +598,7 @@ main() {
   write_unit
   install_metrics
   [ "$BYPASS_VPN" = 1 ] && setup_vpn_bypass
-  [ "$WITH_STT" = 1 ] && setup_stt
+  if [ "$WITH_STT" = 1 ]; then setup_stt; else maybe_offer_stt; fi
   local ip
   ip="$(tailscale ip -4 | head -n1)"
   log "DONE. $NODE_NAME mesh-ip=$ip port=$NODE_PORT"

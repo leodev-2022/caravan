@@ -99,7 +99,10 @@ Tasks instead of systemd; Node.js and Tailscale are downloaded directly, so
   binds to the mesh IP only.
 
 ### STT (voice → text), optional per node
-STT is **capability-aware**. On the node, ask for a recommendation first:
+STT is **capability-aware**: on a machine with the resources for it (≥12 GB RAM
+or a GPU) `node-join.sh` **offers** voice-to-text interactively after the join
+(interactive runs only — `CARAVAN_YES=1`/no TTY just prints a hint). Ask for the
+recommendation explicitly:
 ```bash
 sudo bash node-join.sh --stt-check      # prints RAM/GPU + the recommended model
 ```
