@@ -279,7 +279,10 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .ob-cmdbox .joincmd{max-height:160px;margin-bottom:10px}
 .ob-cmdactions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px}
 .obempty{color:var(--muted)}
-details.adv{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.magic{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.magic-h{font-size:14px;margin-bottom:4px}
+.magic-h .spark{color:var(--accent)}
+details.adv{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
 details.adv>summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
 details.adv>summary:hover{color:var(--accent)}
 details.adv[open]>summary{margin-bottom:10px}
@@ -326,8 +329,8 @@ JS = """
         obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         bar_run:"идёт",bar_ok:"готово",bar_err:"ошибка",
-        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Скопируйте команду и выполните её на новой машине — она появится здесь сама.",jgenerate:"Новая команда",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",jwhere:"Linux/VM — вставьте в терминале. Proxmox LXC — на хосте pct enter <VMID>, затем вставьте.",advsum:"Продвинуто: подключить по SSH / ключом",obcopy:"Скопировать команду",
-        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль SSH (необязательно)",provbtn:"Провизжинить по SSH",provname:"Имя узла",
+        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Скопируйте команду и выполните её на новой машине — она появится здесь сама.",jgenerate:"Новая команда",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",jwhere:"Linux/VM — вставьте в терминале. Proxmox LXC — на хосте pct enter <VMID>, затем вставьте.",advsum:"Дополнительно: пользователь и имя",obcopy:"Скопировать команду",
+        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль root",provbtn:"Подключить",provname:"Имя узла",magictitle:"Магия: подключить по SSH",magichint:"Хаб сам всё поставит и зарегистрирует, если у машины есть пароль root (обычные VPS/VM). Для Proxmox LXC — используйте команду выше.",magicbtn:"Подключить",
         keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
@@ -341,8 +344,8 @@ JS = """
         obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
         bar_run:"in progress",bar_ok:"done",bar_err:"error",
-        join:"Invite",jointitle:"Join a machine",joinhint:"Copy the command and run it on the new machine — it will show up here by itself.",jgenerate:"New command",jcopy:"Copy",joinempty:"Generate an invite first",jwhere:"Linux/VM — paste it in a terminal. Proxmox LXC — on the host run pct enter <VMID>, then paste.",advsum:"Advanced: connect over SSH / with a key",obcopy:"Copy command",
-        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"SSH password (optional)",provbtn:"Provision by SSH",provname:"Node name",
+        join:"Invite",jointitle:"Join a machine",joinhint:"Copy the command and run it on the new machine — it will show up here by itself.",jgenerate:"New command",jcopy:"Copy",joinempty:"Generate an invite first",jwhere:"Linux/VM — paste it in a terminal. Proxmox LXC — on the host run pct enter <VMID>, then paste.",advsum:"Advanced: user and name",obcopy:"Copy command",
+        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"root password",provbtn:"Connect",provname:"Node name",magictitle:"Magic: connect over SSH",magichint:"The hub installs and registers everything if the machine has a root password (typical VPS/VM). For a Proxmox LXC use the command above.",magicbtn:"Connect",
         keyhint:"…or add the hub public key to the new machine (authorized_keys, or the «SSH public key» field when creating a LXC/VM):",keycopy:"Copy key"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
@@ -633,23 +636,26 @@ def render(data, statuses, ts):
     <button id="jclose" class="mini" data-i18n="cancel">Закрыть</button>
   </div>
   <p class="hint" data-i18n="jwhere">Linux/VM — вставьте в терминале. Proxmox LXC — на хосте <code>pct enter &lt;VMID&gt;</code>, затем вставьте.</p>
-  <details class="adv">
-    <summary data-i18n="advsum">Продвинуто: подключить по SSH / ключом</summary>
-    <div class="prov">
+  <div class="magic">
+    <div class="magic-h"><span class="spark">&#10022;</span> <b data-i18n="magictitle">Магия: подключить по SSH</b></div>
+    <p class="hint" data-i18n="magichint">Хаб сам всё поставит и зарегистрирует, если у машины есть пароль root (обычные VPS/VM). Для Proxmox LXC — используйте команду выше.</p>
+    <div class="grid2">
+      <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10" autocomplete="off"></div>
+      <div class="row"><label data-i18n="provpass">Пароль root</label><input id="p-pass" type="password" autocomplete="new-password"></div>
+    </div>
+    <div class="grid2">
+      <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
+      <div class="row" style="justify-content:flex-end"><button id="pprov" class="open" data-i18n="magicbtn">Подключить</button></div>
+    </div>
+    <details class="adv">
+      <summary data-i18n="advsum">Дополнительно: пользователь и имя</summary>
       {key_block}
-      <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба; пароль можно оставить пустым — тогда используется ключ хаба):</p>
       <div class="grid2">
-        <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10" autocomplete="off"></div>
-        <div class="row"><label>ssh user</label><input id="p-user" placeholder="root" autocomplete="off"></div>
-        <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="new-password"></div>
+        <div class="row"><label>ssh user</label><input id="p-user" value="root" autocomplete="off"></div>
         <div class="row"><label data-i18n="provname">Имя узла</label><input id="p-name" placeholder="node1" autocomplete="off"></div>
       </div>
-      <div class="grid2">
-        <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
-        <div class="row" style="justify-content:flex-end"><button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button></div>
-      </div>
-    </div>
-  </details>
+    </details>
+  </div>
 </div></div>
 <button id="totop" class="totop" hidden title="↑">↑</button>
 <script>{JS.replace('__REFRESH__', str(REFRESH))}</script>
