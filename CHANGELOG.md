@@ -1,27 +1,30 @@
 # Changelog
 
-All notable changes to Caravan are documented here.
-The format is based on [Keep a Changelog](https://keepachangelog.com/),
-and this project adheres to [Semantic Versioning](https://semver.org/).
+Highlights of the Caravan journey. See **GitHub Releases** for the full notes of
+each version.
 
-## [0.1.0] - 2026-09-11
+## v0.7.x — onboarding & UX
+- **Live step-by-step progress** while the hub provisions a machine over SSH
+  (`installing Node` → `joining mesh` → `registered`), with elapsed time.
+- A fresh hub hands you the **ready copy-paste command**; the **“magic”** SSH form
+  (host + password/key) installs and registers a machine for you.
+- **Auto-registration**: new mesh nodes appear on the dashboard by themselves.
+- **Real delete** — removes the node from the dashboard, Caddy and the mesh
+  (and it does not come back).
 
-First public release.
+## v0.6.x — it just works
+- The **hub joins its own mesh** (so it can reach nodes and proxy them).
+- Self-signed mode serves the local CA at `/ca.crt` so nodes trust the control server.
+- Windows nodes (`node-join.ps1`), multi-engine (CodeNomad / OpenCode), node metrics, PWA.
 
-### Added
-- **Hub installer** (`install.sh`): Docker + Compose, secret generation, stack
-  layout, config rendering, TLS modes (`--domain` / `--sslip` / `--self-signed`),
-  idempotent re-run and `--update`.
-- **Node onboarding** (`node-join.sh`): flag-based, mesh join, systemd unit,
-  `--uninstall`/`--purge`, and capability-aware speech-to-text
-  (`--stt-check` / `--stt` / `--stt-model`).
-- **CLI** (`caravan`): `install`, `update`, `doctor`, `nodes list`, `token`,
-  `add-node`, `remove-node`, `backup`, `restore`, `uninstall`, `version`.
-- **Mesh** (headscale) + **SSO/TOTP** (Authelia) + **portal** dashboard with
-  live status and Telegram alerts.
-- **Tests & CI**: unit tests, CLI smoke tests, integration test (full stack),
-  `make ci`.
+## v0.5.x — the new-user path
+- **One-command hub install** with **automatic TOTP** (a scannable QR in the terminal).
+- **One-command node join**; SSH provisioning; a friendly guard for Proxmox LXC (TUN).
+- First-run **onboarding** screen instead of an empty dashboard.
 
-### Security
-- Default-deny perimeter (only 443 public), mesh-only nodes (no inbound),
-  SSO + TOTP at the edge, root-only secrets, and a secret/leak scan in `make check`.
+## v0.1.0 — first public snapshot
+- Hub stack (Caddy + Authelia + headscale + portal), the `caravan` CLI, node
+  onboarding, docs and CI.
+
+> Caravan consumes OpenCode (anomalyco, MIT) and CodeNomad (NeuralNomadsAI, MIT)
+> as dependencies — it does not fork or rebrand them.
