@@ -27,29 +27,22 @@ door, and a self-hosted mesh so your machines never need inbound ports.
 - **Open source** — MIT.
 
 ## Screenshots
-![Caravan dashboard](docs/img/dashboard.png)
 
-*Live dashboard — per-machine status, locations, tags, one-click open, behind SSO
-(dark & light themes).*
-
+**1. A fresh hub hands you one command.**
 ![Connect your first machine](docs/img/onboarding.png)
 
-*Fresh hub: the ready copy-paste command — run it on a machine and it appears here
-by itself.*
-
+**2. Connect a machine — the one-liner, or the “magic” SSH form that installs and
+registers it for you.**
 ![Join a machine](docs/img/join.png)
 
-*Two ways: copy the one-line command, or the “magic” SSH form (hub installs and
-registers the machine for you).*
+**3. Every machine shows up live — status, CPU/RAM, uptime, one-click open (SSO).**
+![Caravan dashboard](docs/img/dashboard.png)
 
+**4. Open a machine and code — the CodeNomad agent cockpit.**
 ![The agent cockpit](docs/img/agent.png)
 
-*Destination: the CodeNomad agent cockpit — chat, tool calls, code and results, all
-in the browser behind SSO.*
-
+**Prefer it manual? Register a machine by its mesh IP.**
 ![Add a machine](docs/img/add-node.png)
-
-*Prefer it manual? Register a machine by its mesh IP.*
 
 ## How it works
 ```
