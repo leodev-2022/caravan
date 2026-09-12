@@ -376,17 +376,19 @@ stt_recommend() {
   local cpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cpu"
   local gpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cuda"
   REC_SAFE=0
-  # CPU-only: large-v3 is impractically slow, so cap the recommendation at medium.
+  # speaches wants the full HuggingFace id (a bare "medium" 404s); CPU-only caps
+  # at medium since large-v3 is impractically slow without a GPU.
+  local hf="Systran/faster-whisper"
   if [ -n "$GPU" ]; then
-    REC_MODEL="large-v3"; REC_IMAGE="$gpu_img"; REC_VERDICT="strongly recommended (GPU)"; REC_SAFE=1
+    REC_MODEL="$hf-large-v3"; REC_IMAGE="$gpu_img"; REC_VERDICT="strongly recommended (GPU)"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 16000 ]; then
-    REC_MODEL="medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
+    REC_MODEL="$hf-medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 8000 ]; then
-    REC_MODEL="small"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
+    REC_MODEL="$hf-small"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 4000 ]; then
-    REC_MODEL="base"; REC_IMAGE="$cpu_img"; REC_VERDICT="tight for this machine"
+    REC_MODEL="$hf-base"; REC_IMAGE="$cpu_img"; REC_VERDICT="tight for this machine"
   else
-    REC_MODEL="tiny"; REC_IMAGE="$cpu_img"; REC_VERDICT="not enough RAM"
+    REC_MODEL="$hf-tiny"; REC_IMAGE="$cpu_img"; REC_VERDICT="not enough RAM"
   fi
 }
 
@@ -457,15 +459,22 @@ setup_stt() {
   docker run -d --name codenomad-stt --restart unless-stopped \
     -p 127.0.0.1:8000:8000 "$image" >/dev/null
   log "STT: downloading model $model (first run can take a while)"
-  local i
-  for i in $(seq 1 10); do
-    if curl -fsS -X POST "http://127.0.0.1:8000/v1/models/$model" >/dev/null 2>&1; then
-      log "STT: model ready ($model)"
+  # trigger the download (the request may block while downloading — that is fine)
+  curl -s -o /dev/null --max-time 900 -X POST "http://127.0.0.1:8000/v1/models/$model" || true
+  local ok=0
+  for _ in $(seq 1 60); do
+    if curl -s --max-time 6 "http://127.0.0.1:8000/v1/models" 2>/dev/null | grep -q "$model"; then
+      ok=1
       break
     fi
-    [ "$i" = 10 ] && warn "STT: model download not confirmed yet (may still be in progress)"
     sleep 6
   done
+  if [ "$ok" != 1 ]; then
+    printf '\033[1;31m[caravan] STT FAILED: model "%s" never appeared in speaches — voice will NOT work. Check the model id / network, then re-run with --stt.\033[0m\n' \
+      "$model" >&2
+    return 0
+  fi
+  log "STT: model ready ($model)"
   wire_codenomad "$model" 8000
   log "STT ready on http://127.0.0.1:8000"
 }
