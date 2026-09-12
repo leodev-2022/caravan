@@ -78,7 +78,7 @@ def find_browser():
     return None
 
 
-def build(status, dark, modal):
+def build(status, dark, modal, magic=False):
     html = status.render(SAMPLE, STATUSES, 0)
     html = html.replace("localStorage.getItem('cn_lang')||'ru'",
                         "localStorage.getItem('cn_lang')||'en'")
@@ -95,6 +95,14 @@ def build(status, dark, modal):
             "document.getElementById('f-label').value='Web server';"
             "document.getElementById('f-location').value='Hetzner · Falkenstein';"
             "document.getElementById('f-tags').value='dev, ai';});</script>")
+        html = html.replace("</body>", inject + "</body>")
+    if magic:
+        inject = (
+            "<script>window.addEventListener('load',function(){"
+            "var b=document.getElementById('applybar');b.hidden=false;"
+            "b.className='applybar run';"
+            "b.textContent='\u23f3 laptop \u2014 installing Node.js 22 (NodeSource) \u00b7 1m';"
+            "});</script>")
         html = html.replace("</body>", inject + "</body>")
     return html
 
@@ -138,13 +146,16 @@ def main():
     tmp = tempfile.mkdtemp()
     try:
         jobs = [
-            ("dashboard.png", "dash", True, False, "1400,860"),
-            ("dashboard-light.png", "dash", False, False, "1400,860"),
-            ("onboarding.png", "onboard", True, False, "1400,900"),
-            ("join.png", "onboard", True, True, "1400,900"),
+            # name, kind, dark, modal, magic, size
+            ("dashboard.png", "dash", True, False, False, "1400,860"),
+            ("dashboard-light.png", "dash", False, False, False, "1400,860"),
+            ("onboarding.png", "onboard", True, False, False, "1400,900"),
+            ("join.png", "onboard", True, True, False, "1400,900"),
+            ("magic.png", "dash", True, False, True, "1400,860"),
         ]
-        for name, kind, dark, modal, size in jobs:
-            html = build_onboard(status, modal) if kind == "onboard" else build(status, dark, modal)
+        for name, kind, dark, modal, magic, size in jobs:
+            html = (build_onboard(status, modal) if kind == "onboard"
+                    else build(status, dark, modal, magic))
             html_path = os.path.join(tmp, name + ".html")
             with open(html_path, "w", encoding="utf-8") as fh:
                 fh.write(html)

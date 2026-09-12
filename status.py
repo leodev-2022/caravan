@@ -507,6 +507,7 @@ def render(data, statuses, ts):
         for e in items:
             name = e["name"]
             lcol = loc_color(loc)
+            loc_chip = f'<span class="chip">{esc(loc)}</span>' if loc != "—" else ""
             st = statuses.get(name, {"status": "offline", "ms": 0})
             onl = st["status"] == "online"
             canon = e.get("hosts", [name])[0]
@@ -530,7 +531,7 @@ def render(data, statuses, ts):
              data-name="{esc(name)}" data-ip="{esc(e['ip'])}" data-port="{esc(e['port'])}" data-label="{esc(e.get('label',''))}"
              data-tags="{esc(','.join(e.get('tags',[])))}" data-aliases="{esc(','.join(aliases))}" data-engine="{esc(e.get('engine',''))}">
           <div class="top">
-            <span class="chip">{esc(loc)}</span>
+            {loc_chip}
             {f'<span class="engine">{esc(e["engine"])}</span>' if e.get('engine') else ''}
             <span class="pill {'online' if onl else 'offline'}" id="st-{esc(name)}"
                   title="{'в сети' if onl else 'недоступен'} {humanize(ts - st.get('since', ts))}">
@@ -551,7 +552,9 @@ def render(data, statuses, ts):
             <button class="mini del" data-del="{esc(name)}" data-i18n-title="delete" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
           </div>
         </div>""")
-        sections.append(f'<div class="groupwrap"><h2 class="group"><span class="dot"></span>{esc(loc)}<span class="chev">▾</span></h2><div class="grid">{"".join(cards)}</div></div>')
+        header = (f'<h2 class="group"><span class="dot"></span>{esc(loc)}<span class="chev">▾</span></h2>'
+                  if loc != "—" else "")
+        sections.append(f'<div class="groupwrap">{header}<div class="grid">{"".join(cards)}</div></div>')
     if invite_cmd:
         cmd_html = f'<pre id="obcmd" class="joincmd">{esc(invite_cmd)}</pre>'
     else:

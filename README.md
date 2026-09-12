@@ -35,6 +35,9 @@ door, and a self-hosted mesh so your machines never need inbound ports.
 registers it for you.**
 ![Join a machine](docs/img/join.png)
 
+*The “magic” never goes silent — live stage + elapsed time while the hub provisions:*
+![Provisioning in progress](docs/img/magic.png)
+
 **3. Every machine shows up live — status, CPU/RAM, uptime, one-click open (SSO).**
 ![Caravan dashboard](docs/img/dashboard.png)
 
