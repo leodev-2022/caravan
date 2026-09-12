@@ -264,18 +264,22 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .ob-docs:hover{color:var(--accent)}
 .modal{position:fixed;inset:0;background:rgba(5,9,14,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modal[hidden]{display:none}
-.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;width:min(520px,96vw);box-shadow:var(--shadow);max-height:92vh;overflow:auto}
-.box h3{margin:0 0 18px;font-weight:700;font-size:17px}
-.row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;width:min(600px,96vw);box-shadow:var(--shadow);max-height:92vh;overflow:auto}
+.box h3{margin:0 0 12px;font-weight:700;font-size:17px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+.row{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
 .row label{font-size:12px;color:var(--muted);font-weight:600}
-.row input{padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel2);color:var(--ink);font-size:14px}
-.row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(242,153,74,.15)}
-.hint{font-size:12px;color:var(--muted);margin:6px 0 18px}
-.joincmd{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;font-family:var(--mono);
-  font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);max-height:180px;overflow:auto;margin:0 0 16px}
-.prov{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.row input,.row select{padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel2);color:var(--ink);font-size:13.5px;width:100%}
+.row input:focus,.row select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(242,153,74,.15)}
+.hint{font-size:12px;color:var(--muted);margin:4px 0 10px;line-height:1.45}
+.joincmd{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px;font-family:var(--mono);
+  font-size:12px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);max-height:120px;overflow:auto;margin:0 0 10px}
+.keyline{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
+.keycmd{flex:1;margin:0;max-height:52px;font-size:11.5px;padding:8px}
+.prov{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .prov .hint{margin-top:0}
-.modalactions{display:flex;gap:10px;justify-content:flex-end}
+.modalactions{display:flex;gap:8px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);color:var(--ink);border:1px solid var(--line);
   padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:60;box-shadow:var(--shadow)}
 .totop{position:fixed;right:22px;bottom:22px;z-index:40;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
@@ -523,11 +527,8 @@ def render(data, statuses, ts):
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
         <input id="q" type="text" data-i18n-ph="filter" placeholder="Фильтр: имя, место, тег… (клавиша /)">
       </div>""" if envs else '')
-    key_block = (f"""<div class="prov">
-    <p class="hint" data-i18n="keyhint">…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):</p>
-    <pre id="hubkey" class="joincmd">{esc(provision_pubkey)}</pre>
-    <div class="modalactions"><button id="keycopy" class="mini" data-i18n="keycopy">Копировать ключ</button></div>
-  </div>""" if provision_pubkey else '')
+    key_block = (f"""<p class="hint" data-i18n="keyhint">…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):</p>
+    <div class="keyline"><pre id="hubkey" class="joincmd keycmd">{esc(provision_pubkey)}</pre><button id="keycopy" class="mini" data-i18n="keycopy">Копировать ключ</button></div>""" if provision_pubkey else '')
     return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="{FAVICON}">
@@ -583,15 +584,19 @@ def render(data, statuses, ts):
     <button id="jcopy" class="open" data-i18n="jcopy">Копировать</button>
     <button id="jclose" class="mini" data-i18n="cancel">Закрыть</button>
   </div>
-  {key_block}
   <div class="prov">
-    <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба, root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):</p>
-    <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10"></div>
-    <div class="row"><label>ssh user</label><input id="p-user" placeholder="root"></div>
-    <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="off"></div>
-    <div class="row"><label data-i18n="provname">Имя узла</label><input id="p-name" placeholder="node1"></div>
-    <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
-    <button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button>
+    {key_block}
+    <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба; пароль можно оставить пустым — тогда используется ключ хаба):</p>
+    <div class="grid2">
+      <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10"></div>
+      <div class="row"><label>ssh user</label><input id="p-user" placeholder="root"></div>
+      <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="off"></div>
+      <div class="row"><label data-i18n="provname">Имя узла</label><input id="p-name" placeholder="node1"></div>
+    </div>
+    <div class="grid2">
+      <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
+      <div class="row" style="justify-content:flex-end"><button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button></div>
+    </div>
   </div>
 </div></div>
 <button id="totop" class="totop" hidden title="↑">↑</button>

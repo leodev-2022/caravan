@@ -67,6 +67,8 @@ if tls_mode == "internal":
     # Serve the internal CA so nodes can trust the control server (tailscale
     # validates its TLS strictly).
     out.append("  handle /ca.crt {")
+    # Caddy's local CA file is named root.crt; expose it as /ca.crt
+    out.append("    rewrite * /root.crt")
     out.append("    root * /data/caddy/pki/authorities/local")
     out.append("    file_server")
     out.append("  }")

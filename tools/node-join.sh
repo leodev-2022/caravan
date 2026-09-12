@@ -192,6 +192,9 @@ install_hub_ca() {
   if curl -fsS -k --max-time 8 "https://${host}/ca.crt" \
     -o /usr/local/share/ca-certificates/caravan-hub.crt 2>/dev/null; then
     update-ca-certificates >/dev/null 2>&1 || true
+    # tailscaled caches the system root pool at start — restart it so it picks
+    # up the freshly trusted CA before we try to log in.
+    systemctl restart tailscaled 2>/dev/null || true
     log "installed the hub CA"
   else
     warn "could not fetch https://${host}/ca.crt — tailscale may fail on a self-signed hub"
