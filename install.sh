@@ -34,6 +34,7 @@ fi
 CARAVAN_DIR="${CARAVAN_DIR:-/opt/caravan}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASSWORD_SHOWN=""
+ADMIN_OTPAUTH=""
 
 usage() {
   cat <<'EOF'
@@ -126,12 +127,15 @@ resolve_tls() {
     [ -n "$ip" ] || die "cannot determine public IP — set HUB_IP in caravan.env or pass --domain"
     local_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
     # If the public IP is not bound to this host, we are behind NAT: sslip.io +
-    # ACME (HTTP-01 on :80) cannot validate. Fall back to the internal CA and a
-    # locally resolvable <ip>.sslip.io name so the browser still reaches us.
-    if [ "$SSLIP" = 0 ] && [ "$TLS_MODE" != "internal" ] && ! ip -4 -o addr show 2>/dev/null | grep -qw "$ip"; then
-      warn "public IP $ip is not on this machine (behind NAT?) — sslip.io/ACME would fail"
-      warn "falling back to --self-signed (browser will warn); pass --domain NAME for trusted TLS"
-      TLS_MODE="internal"
+    # ACME (HTTP-01 on :80) cannot validate, and a public-IP name would not route
+    # back to us either. Use the local IP and (unless asked for a real domain)
+    # the internal CA, so the browser still reaches us.
+    if ! ip -4 -o addr show 2>/dev/null | grep -qw "$ip"; then
+      if [ "$TLS_MODE" != "internal" ]; then
+        warn "public IP $ip is not on this machine (behind NAT?) — sslip.io/ACME would fail"
+        warn "falling back to --self-signed (browser will warn); pass --domain NAME for trusted TLS"
+        TLS_MODE="internal"
+      fi
       ip="${local_ip:-$ip}"
     fi
     DOMAIN="$(printf '%s' "$ip" | tr '.' '-').sslip.io"
@@ -150,6 +154,7 @@ install_docker() {
     return 0
   fi
   log "installing Docker + Compose (official apt repo)"
+  log "this can take a few minutes and prints little — it is not stuck"
   apt-get update -qq
   apt-get install -y -qq ca-certificates curl gnupg >/dev/null
   install -m 0755 -d /etc/apt/keyrings
@@ -180,6 +185,7 @@ install_secrets() {
   chmod 755 "$CARAVAN_DIR"
   local fresh=0 out
   [ -f "$CARAVAN_DIR/secrets.env" ] || fresh=1
+  log "generating secrets (the admin password hash pulls Authelia — can take ~1 min)"
   out="$(SECRETS_FILE="$CARAVAN_DIR/secrets.env" ADMIN_USER="$ADMIN_USER" \
     bash "$HERE/scripts/gen-secrets.sh")"
   printf '%s\n' "$out"
@@ -216,6 +222,8 @@ layout_stack() {
   cp -f "$HERE/generate_caddy.py" "$HERE/render.py" "$HERE/status.py" "$CARAVAN_DIR/"
   cp -f "$HERE/conf/"*.yml "$HERE/conf/"*.yaml "$CARAVAN_DIR/conf/"
   cp -f "$HERE/tools/"*.py "$HERE/tools/"*.sh "$CARAVAN_DIR/tools/" 2>/dev/null || true
+  mkdir -p "$CARAVAN_DIR/scripts"
+  cp -f "$HERE/scripts/register-totp.py" "$CARAVAN_DIR/scripts/" 2>/dev/null || true
   cp -f "$HERE/systemd/"*.service "$HERE/systemd/"*.path "$CARAVAN_DIR/systemd/" 2>/dev/null || true
   if [ ! -f "$CARAVAN_DIR/nodes.yaml" ]; then
     cp -f "$HERE/conf/nodes.example.yaml" "$CARAVAN_DIR/nodes.yaml"
@@ -271,12 +279,39 @@ pull_images() {
 
 start_stack() {
   log "starting the stack (docker compose up -d)"
+  log "first run pulls images — this can take several minutes"
   (
     cd "$CARAVAN_DIR"
     docker compose up -d
     sleep 3
     docker compose ps
   )
+}
+
+register_admin_totp() {
+  # Register the admin's TOTP programmatically so the first login needs no
+  # browser "identity verification" dance. Only possible when we know the
+  # plaintext password (a fresh install); on re-runs we skip it.
+  [ -n "$ADMIN_PASSWORD_SHOWN" ] || return 0
+  local script="$CARAVAN_DIR/scripts/register-totp.py"
+  [ -f "$script" ] || script="$HERE/scripts/register-totp.py"
+  [ -f "$script" ] || return 0
+  log "waiting for Authelia to become ready"
+  local i
+  for i in $(seq 1 30); do
+    curl -fsS -k --max-time 5 "https://auth.$DOMAIN/api/health" >/dev/null 2>&1 && break
+    sleep 2
+  done
+  log "registering TOTP for '$ADMIN_USER' (no browser setup needed)"
+  local otpauth=""
+  otpauth="$(python3 "$script" --base "https://auth.$DOMAIN" --user "$ADMIN_USER" \
+    --password "$ADMIN_PASSWORD_SHOWN" --notify "$CARAVAN_DIR/authelia/notification.txt" \
+    --target "https://hub.$DOMAIN/" 2>/dev/null || true)"
+  if [ -n "$otpauth" ]; then
+    ADMIN_OTPAUTH="$otpauth"
+  else
+    warn "could not auto-register TOTP — register it in the Authelia UI on first login"
+  fi
 }
 
 print_summary() {
@@ -291,7 +326,16 @@ print_summary() {
   else
     printf '    password: unchanged (set ADMIN_PASSWORD and re-run scripts/gen-secrets.sh to reset)\n'
   fi
-  printf '    first login: register TOTP when prompted\n'
+  if [ -n "$ADMIN_OTPAUTH" ]; then
+    local secret="${ADMIN_OTPAUTH##*secret=}"
+    secret="${secret%%&*}"
+    printf '    TOTP   : add this to your authenticator app (Google Authenticator, Aegis, ...):\n'
+    printf '             otpauth: %s\n' "$ADMIN_OTPAUTH"
+    printf '             secret : %s\n' "$secret"
+    printf '             then log in with the 6-digit code it shows\n'
+  else
+    printf '    first login: register TOTP when prompted\n'
+  fi
   if [ "$TLS_MODE" = internal ]; then
     printf '    note: self-signed cert — the browser will warn; accept to continue\n'
   fi
@@ -317,9 +361,11 @@ warn_early_stage() {
     (installs Docker, uses ports 80/443, runs containers, writes configs).
   * MIT licence: provided "as is", without warranty of any kind.
 EOF
-  if [ -t 0 ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
+  # Ask on the controlling terminal so the prompt also works for
+  # `curl ... | sudo bash` (where stdin is the pipe, not a TTY).
+  if [ "${CARAVAN_YES:-0}" != "1" ] && [ -r /dev/tty ]; then
     printf 'Continue? [y/N] '
-    read -r ans
+    read -r ans < /dev/tty || ans=""
     case "$ans" in y | Y | yes | YES) : ;; *) die "aborted by user" ;; esac
   fi
 }
@@ -344,6 +390,7 @@ main() {
   install_units
   [ "$UPDATE" = 1 ] && pull_images
   start_stack
+  register_admin_totp
   print_summary
   log "stage done: docker + compose + secrets + .env + stack + configs (tls=$TLS_MODE)"
 }
