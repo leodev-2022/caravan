@@ -165,9 +165,9 @@ CSS = """
   --bg:#0b0f14;--panel:#131922;--panel2:#0f151d;--line:#222c38;--line2:#303c4a;
   --ink:#e9eff7;--muted:#8a99ad;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --ok:#34d399;--down:#f87171;--warn:#fbbf24;--radius:12px;--radius-sm:8px;
-  --shadow:0 10px 30px -14px rgba(0,0,0,.7)}
+  --shadow:0 10px 30px -14px rgba(0,0,0,.7);--topbar:rgba(11,15,20,.82)}
 [data-theme="light"]{--bg:#f6f8fb;--panel:#ffffff;--panel2:#fbfcfe;--line:#e3e8ef;--line2:#d4dae3;
-  --ink:#0f1b2a;--muted:#5b6b7f;--shadow:0 10px 30px -14px rgba(15,27,42,.22)}
+  --ink:#0f1b2a;--muted:#5b6b7f;--shadow:0 10px 30px -14px rgba(15,27,42,.22);--topbar:rgba(246,248,251,.82)}
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);
   background-color:var(--bg);background-image:radial-gradient(900px 480px at 50% -12%,rgba(242,153,74,.08),transparent 70%);
@@ -175,7 +175,9 @@ body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-s
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 .wrap{width:100%;max-width:1200px;margin:0 auto;padding:24px 24px 48px;flex:1 0 auto;display:flex;flex-direction:column}
-header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.topbar{position:sticky;top:0;z-index:30;background:var(--topbar);
+  backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1200px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:12px}
 .brand .name{font-size:22px;font-weight:800;letter-spacing:-.01em;line-height:1}
 .brand .name span{color:var(--accent)}
@@ -192,7 +194,7 @@ header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20p
 .addbtn{border:1px solid transparent;background:var(--accent);color:var(--accent-ink);border-radius:var(--radius-sm);padding:10px 16px;
   font-weight:700;font-size:14px;cursor:pointer;transition:background .15s}
 .addbtn:hover{background:var(--accent2)}
-.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 22px}
+.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:0;padding-bottom:12px}
 .chipf{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:6px 14px;font-size:13px;
   font-weight:600;cursor:pointer;transition:all .15s}
 .chipf:hover{color:var(--ink);border-color:var(--line2)}
@@ -260,6 +262,11 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .modalactions{display:flex;gap:10px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel);color:var(--ink);border:1px solid var(--line);
   padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:60;box-shadow:var(--shadow)}
+.totop{position:fixed;right:22px;bottom:22px;z-index:40;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink);box-shadow:var(--shadow);cursor:pointer;font-size:18px;line-height:1;
+  display:grid;place-items:center;transition:border-color .15s,transform .1s}
+.totop:hover{border-color:var(--accent);transform:translateY(-1px)}
+.totop[hidden]{display:none}
 """
 
 JS = """
@@ -349,6 +356,7 @@ JS = """
     if(b){navigator.clipboard.writeText(b.getAttribute('data-copy')).then(function(){toast(I18N[cur()].copied);}); return;}
     var t=e.target.closest('#langtoggle'); if(t){apply(cur()==='ru'?'en':'ru'); return;}
     var th=e.target.closest('#themebtn'); if(th){var c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');return;}
+    var tt=e.target.closest('#totop'); if(tt){window.scrollTo({top:0,behavior:'smooth'});return;}
     var ad=e.target.closest('#addbtn'); if(ad){openModal({});return;}
     var jb=e.target.closest('#joinbtn'); if(jb){document.getElementById('joinmodal').hidden=false;return;}
     var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
@@ -380,6 +388,7 @@ JS = """
     if(e.key==='/'&&document.activeElement&&document.activeElement.id!=='q'){e.preventDefault();document.getElementById('q').focus();}
     if(e.key==='Escape'){['modal','joinmodal'].forEach(function(id){var m=document.getElementById(id); if(m) m.hidden=true;});}
   });
+  window.addEventListener('scroll',function(){var b=document.getElementById('totop'); if(b) b.hidden=window.scrollY<400;});
   apply(cur()); setTheme(localStorage.getItem('cn_theme')||'dark');
   setInterval(poll,REFRESH); poll();
 })();
@@ -464,8 +473,7 @@ def render(data, statuses, ts):
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Caravan</title><style>{CSS}</style></head><body>
-<div class="wrap">
-  <header>
+<header class="topbar"><div class="topbar-in">
     <div class="brand">{LOGO_SVG}
       <div><div class="name">Cara<span>van</span></div>
       <div class="sub">{len(envs)} <span data-i18n="envs">окружений</span></div></div>
@@ -480,11 +488,13 @@ def render(data, statuses, ts):
       <button id="langtoggle" class="iconbtn2" title="RU / EN">EN</button>
       <button id="themebtn" class="iconbtn2" title="theme">☾</button>
     </div>
-  </header>
-  <div class="filters">
+  </div>
+  <div class="topbar-in filters">
     {''.join(chips)}
     <span class="meta-line"><span data-i18n="updated">обновлено</span> <span id="utime">{time.strftime('%H:%M:%S', time.localtime(ts))}</span> · <span data-i18n="autorefresh">автообновление</span> {REFRESH}s</span>
   </div>
+</header>
+<div class="wrap">
   {body}
   <div class="foot"><a href="https://{esc(domain)}/">{esc(domain)}</a></div>
 </div>
@@ -521,6 +531,7 @@ def render(data, statuses, ts):
     <button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button>
   </div>
 </div></div>
+<button id="totop" class="totop" hidden title="↑">↑</button>
 <script>{JS.replace('__REFRESH__', str(REFRESH))}</script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');</script>
 </body></html>"""
