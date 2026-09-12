@@ -550,6 +550,14 @@ def refresh_loop():
                             entry[k] = m[k]
                 statuses[name] = entry
                 cur[name] = (st, ms)
+            # prune state for nodes that no longer exist (removed or renamed)
+            live = {e["name"] for e in data.get("envs", [])}
+            for stale in [n for n in list(_since_status) if n not in live]:
+                _since_status.pop(stale, None)
+                _since.pop(stale, None)
+                changed = True
+            for stale in [n for n in list(_last_status) if n not in live]:
+                _last_status.pop(stale, None)
             if changed:
                 save_state()
             track_transitions(data.get("envs", []), cur)
