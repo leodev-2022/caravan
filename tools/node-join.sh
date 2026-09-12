@@ -483,8 +483,9 @@ remove_awg_bypass() {
 uninstall() {
   log "uninstalling Caravan node services (files and packages are kept)"
   if have tailscale && tailscale status >/dev/null 2>&1; then
-    tailscale down 2>/dev/null || true
-    log "left the mesh (tailscale down)"
+    # logout (not just down) so a later re-join is not skipped as "already joined"
+    tailscale logout 2>/dev/null || tailscale down 2>/dev/null || true
+    log "left the mesh"
   fi
   systemctl disable --now codenomad 2>/dev/null || true
   rm -f /etc/systemd/system/codenomad.service
