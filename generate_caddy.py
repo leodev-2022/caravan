@@ -37,7 +37,7 @@ nodes_path = os.path.join(BASE, "nodes.yaml")
 if not os.path.exists(nodes_path):
     nodes_path = os.path.join(BASE, "nodes.example.yaml")
 with open(nodes_path, encoding="utf-8") as f:
-    cfg = yaml.safe_load(f)
+    cfg = yaml.safe_load(f) or {}
 domain = resolve("DOMAIN", cfg.get("domain", ""))
 email = resolve("EMAIL", cfg.get("email", ""))
 auth_url = resolve("AUTH_URL", f"https://auth.{domain}" if domain else "")

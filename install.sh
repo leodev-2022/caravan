@@ -289,7 +289,7 @@ layout_stack() {
   mkdir -p "$CARAVAN_DIR/scripts"
   cp -f "$HERE/scripts/lib.sh" "$CARAVAN_DIR/scripts/lib.sh"
   cp -f "$HERE/scripts/register-totp.py" "$CARAVAN_DIR/scripts/" 2>/dev/null || true
-  cp -f "$HERE/systemd/"*.service "$HERE/systemd/"*.path "$CARAVAN_DIR/systemd/" 2>/dev/null || true
+  cp -f "$HERE/systemd/"*.service "$HERE/systemd/"*.path "$HERE/systemd/"*.timer "$CARAVAN_DIR/systemd/" 2>/dev/null || true
   if [ ! -f "$CARAVAN_DIR/nodes.yaml" ]; then
     # Start empty: never seed the example nodes into a real hub (they would
     # show up as phantom "offline" machines in the portal on first login).
@@ -437,8 +437,13 @@ install_units() {
     /etc/systemd/system/codenomad-apply.path "CARAVAN_DIR=$CARAVAN_DIR"
   python3 "$CARAVAN_DIR/render.py" "$CARAVAN_DIR/systemd/codenomad-apply.service" \
     /etc/systemd/system/codenomad-apply.service "CARAVAN_DIR=$CARAVAN_DIR"
+  python3 "$CARAVAN_DIR/render.py" "$CARAVAN_DIR/systemd/caravan-sync-nodes.service" \
+    /etc/systemd/system/caravan-sync-nodes.service "CARAVAN_DIR=$CARAVAN_DIR"
+  python3 "$CARAVAN_DIR/render.py" "$CARAVAN_DIR/systemd/caravan-sync-nodes.timer" \
+    /etc/systemd/system/caravan-sync-nodes.timer "CARAVAN_DIR=$CARAVAN_DIR"
   systemctl daemon-reload
   systemctl enable --now codenomad-apply.path
+  systemctl enable --now caravan-sync-nodes.timer
 }
 
 warn_early_stage() {
