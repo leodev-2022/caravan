@@ -140,7 +140,6 @@ def main():
         jobs = [
             ("dashboard.png", "dash", True, False, "1400,860"),
             ("dashboard-light.png", "dash", False, False, "1400,860"),
-            ("add-node.png", "dash", True, True, "1000,780"),
             ("onboarding.png", "onboard", True, False, "1400,900"),
             ("join.png", "onboard", True, True, "1400,900"),
         ]

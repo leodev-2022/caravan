@@ -41,9 +41,6 @@ registers it for you.**
 **4. Open a machine and code — the CodeNomad agent cockpit.**
 ![The agent cockpit](docs/img/agent.png)
 
-**Prefer it manual? Register a machine by its mesh IP.**
-![Add a machine](docs/img/add-node.png)
-
 ## How it works
 ```
 Browser (anywhere)
