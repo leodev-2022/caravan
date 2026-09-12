@@ -32,9 +32,19 @@ door, and a self-hosted mesh so your machines never need inbound ports.
 *Live dashboard — per-machine status, locations, tags, one-click open, behind SSO
 (dark & light themes).*
 
-![Add an environment](docs/img/add-node.png)
+![Connect your first machine](docs/img/onboarding.png)
 
-*Register a machine in seconds — onboard it with `node-join.sh`, then add it here.*
+*Fresh hub: the ready copy-paste command — run it on a machine and it appears here
+by itself.*
+
+![Join a machine](docs/img/join.png)
+
+*Two ways: copy the one-line command, or the “magic” SSH form (hub installs and
+registers the machine for you).*
+
+![Add a machine](docs/img/add-node.png)
+
+*Prefer it manual? Register a machine by its mesh IP.*
 
 ## How it works
 ```

@@ -48,6 +48,17 @@ STATUSES = {
 }
 
 
+INVITE_CMD = ("curl -fsSL https://raw.githubusercontent.com/leodev-2022/caravan/main/"
+              "tools/node-join.sh | sudo bash -s -- --hub https://mesh.example.com "
+              "--token hskey-auth-DEMO-XXXX")
+ONBOARD = {
+    "domain": "example.com",
+    "auth_url": "https://auth.example.com",
+    "provision_pubkey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEY caravan-provision",
+    "envs": [],
+}
+
+
 def load_status():
     spec = importlib.util.spec_from_file_location("status", os.path.join(ROOT, "status.py"))
     module = importlib.util.module_from_spec(spec)
@@ -88,6 +99,26 @@ def build(status, dark, modal):
     return html
 
 
+def build_onboard(status, modal=False):
+    tmpd = tempfile.mkdtemp()
+    with open(os.path.join(tmpd, "invite.txt"), "w", encoding="utf-8") as fh:
+        fh.write(INVITE_CMD)
+    old = status.REQUESTS_DIR
+    status.REQUESTS_DIR = tmpd
+    try:
+        html = status.render(ONBOARD, {}, 0)
+    finally:
+        status.REQUESTS_DIR = old
+        shutil.rmtree(tmpd, ignore_errors=True)
+    html = html.replace("localStorage.getItem('cn_lang')||'ru'",
+                        "localStorage.getItem('cn_lang')||'en'")
+    if modal:
+        inject = ("<script>window.addEventListener('load',function(){"
+                  "document.getElementById('joinmodal').hidden=false;});</script>")
+        html = html.replace("</body>", inject + "</body>")
+    return html
+
+
 def shot(browser, html_path, png_path, size):
     subprocess.run(
         [browser, "--headless", "--disable-gpu", "--hide-scrollbars",
@@ -107,12 +138,14 @@ def main():
     tmp = tempfile.mkdtemp()
     try:
         jobs = [
-            ("dashboard.png", True, False, "1400,860"),
-            ("dashboard-light.png", False, False, "1400,860"),
-            ("add-node.png", True, True, "1000,780"),
+            ("dashboard.png", "dash", True, False, "1400,860"),
+            ("dashboard-light.png", "dash", False, False, "1400,860"),
+            ("add-node.png", "dash", True, True, "1000,780"),
+            ("onboarding.png", "onboard", True, False, "1400,900"),
+            ("join.png", "onboard", True, True, "1400,900"),
         ]
-        for name, dark, modal, size in jobs:
-            html = build(status, dark, modal)
+        for name, kind, dark, modal, size in jobs:
+            html = build_onboard(status, modal) if kind == "onboard" else build(status, dark, modal)
             html_path = os.path.join(tmp, name + ".html")
             with open(html_path, "w", encoding="utf-8") as fh:
                 fh.write(html)
