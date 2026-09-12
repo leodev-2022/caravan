@@ -226,7 +226,13 @@ layout_stack() {
   cp -f "$HERE/scripts/register-totp.py" "$CARAVAN_DIR/scripts/" 2>/dev/null || true
   cp -f "$HERE/systemd/"*.service "$HERE/systemd/"*.path "$CARAVAN_DIR/systemd/" 2>/dev/null || true
   if [ ! -f "$CARAVAN_DIR/nodes.yaml" ]; then
-    cp -f "$HERE/conf/nodes.example.yaml" "$CARAVAN_DIR/nodes.yaml"
+    # Start empty: never seed the example nodes into a real hub (they would
+    # show up as phantom "offline" machines in the portal on first login).
+    {
+      echo "# Caravan environments (source of truth)."
+      echo "# Add machines via the portal (+ Add / Invite) or tools/add-node.sh."
+      echo "envs: []"
+    } > "$CARAVAN_DIR/nodes.yaml"
   fi
 }
 
