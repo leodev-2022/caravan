@@ -403,7 +403,7 @@ JS = """
       var fin=ap.finished||0;var age=fin?(Date.now()/1000-fin):0;
       ab.setAttribute('data-fin',String(fin));
       if(fin&&localStorage.getItem('cn_apply_ack')===String(fin)){ab.hidden=true;}
-      else if(as==='running'){ab.hidden=false;ab.className='applybar run';ab.textContent='\u23f3 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_run+' \u00b7 '+humanize(Date.now()/1000-(ap.started||Date.now()/1000));}
+      else if(as==='running'){ab.hidden=false;ab.className='applybar run';ab.textContent='\u23f3 '+(ap.name||'')+' \u2014 '+(ap.message||I18N[cur()].bar_run)+' \u00b7 '+humanize(Date.now()/1000-(ap.started||Date.now()/1000));}
       else if(as==='error'&&age<600){ab.hidden=false;ab.className='applybar err';var m=ap.message||I18N[cur()].bar_err;if(/denied|\u043e\u0442\u043a\u0430\u0437/i.test(m))m=m+' \u2014 '+I18N[cur()].errssh;ab.textContent='\u26a0 '+(ap.name?ap.name+': ':'')+m+'  (\u00d7)';}
       else if(as==='ok'&&age<180){ab.hidden=false;ab.className='applybar ok';ab.textContent='\u2713 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_ok;}
       else{ab.hidden=true;}

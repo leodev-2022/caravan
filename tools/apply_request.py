@@ -4,11 +4,14 @@
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import time
 
 import yaml
+
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 BASE = os.environ.get("CARAVAN_DIR", "/opt/hub")
 REQ = os.path.join(BASE, "requests")
@@ -47,8 +50,12 @@ def _apply_status(**kw):
         pass
 
 
-def handle_provision(base, req):
-    """Provision a reachable machine over SSH. Returns (ok, short_message)."""
+def handle_provision(base, req, on_progress=None):
+    """Provision a reachable machine over SSH. Returns (ok, short_message).
+
+    `on_progress(text)` is called for each meaningful stage line so the portal
+    can show live progress while the (long) provisioning runs.
+    """
     script = os.path.join(base, "tools", "provision.sh")
     if not os.path.exists(script):
         return False, "tools/provision.sh not found"
@@ -68,12 +75,21 @@ def handle_provision(base, req):
         args += ["--key", str(req["key"])]
     # else: provision.sh falls back to the hub's provisioning key
     try:
-        r = subprocess.run(args, capture_output=True, text=True, timeout=1800, env=env)
-        tail = [ln for ln in (r.stdout or "").strip().splitlines() if ln.strip()]
+        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, env=env, bufsize=1)
+        tail = []
+        for raw in proc.stdout:
+            line = ANSI.sub("", raw).strip()
+            if not line:
+                continue
+            tail.append(line)
+            if on_progress and line.startswith("[") and "] " in line:
+                on_progress(line.split("]", 1)[1].strip()[:200])
+        proc.wait()
         for line in tail[-6:]:
             print("[apply] provision:", line)
-        if r.returncode != 0:
-            msg = (tail[-1] if tail else "") or (r.stderr or "").strip()[:200]
+        if proc.returncode != 0:
+            msg = (tail[-1] if tail else "") or "provisioning failed"
             print("[apply] provision failed:", msg[:200])
             return False, msg[:300]
         reg = next((ln for ln in reversed(tail) if "->" in ln), "done")
@@ -155,12 +171,17 @@ def main():
         action = req.get("action", "add")
         label = ((req.get("env") or {}).get("name") or req.get("name")
                  or req.get("host") or "")
-        _apply_status(status="running", action=action, name=label, started=time.time())
+        started = time.time()
+        _apply_status(status="running", action=action, name=label, started=started)
         ok, msg = True, ""
         if action == "invite":
             handle_invite(BASE, REQ)
         elif action == "provision":
-            ok, msg = handle_provision(BASE, req)
+            def _progress(text, _label=label, _started=started):
+                _apply_status(status="running", action="provision", name=_label,
+                              message=text, started=_started)
+
+            ok, msg = handle_provision(BASE, req, _progress)
         else:
             envs, ch = apply_one(envs, req)
             if ch:

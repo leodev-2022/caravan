@@ -125,11 +125,16 @@ EOF
 )
 
 log "provisioning $USER@$HOST (this can take a few minutes)"
+out_file="$(mktemp)"
+# stream the remote output (live progress) while keeping it for ip/port parsing
 # shellcheck disable=SC2029
-out="$("${SSH[@]}" "$USER@$HOST" "$remote" 2>&1)" || {
-  printf '%s\n' "$out" | tail -n 20
+if ! "${SSH[@]}" "$USER@$HOST" "$remote" 2>&1 | tee "$out_file"; then
+  tail -n 20 "$out_file"
+  rm -f "$out_file"
   die "provisioning failed"
-}
+fi
+out="$(cat "$out_file")"
+rm -f "$out_file"
 printf '%s\n' "$out" | tail -n 6
 
 ip="$(printf '%s\n' "$out" | sed -n 's/.*mesh-ip=\([0-9.]*\).*/\1/p' | tail -n1)"
