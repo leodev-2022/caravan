@@ -42,12 +42,14 @@ MANIFEST_JSON = json.dumps({
 })
 
 SW_JS = """
-const C='caravan-v1';
+const C='caravan-v2';
 self.addEventListener('install',function(){self.skipWaiting();});
-self.addEventListener('activate',function(e){e.waitUntil(self.clients.claim());});
+self.addEventListener('activate',function(e){e.waitUntil(
+  caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!==C;}).map(function(k){return caches.delete(k);}));})
+    .then(function(){return self.clients.claim();}));});
 self.addEventListener('fetch',function(e){
   var u=new URL(e.request.url);
-  if(e.request.method!=='GET'||u.pathname.indexOf('/status.json')===0||u.pathname.indexOf('/api/')===0)return;
+  if(e.request.method!=='GET'||e.request.mode==='navigate'||u.pathname==='/'||u.pathname.indexOf('/status.json')===0||u.pathname.indexOf('/api/')===0)return;
   e.respondWith(fetch(e.request).then(function(r){var c=r.clone();caches.open(C).then(function(x){x.put(e.request,c);});return r;})
     .catch(function(){return caches.match(e.request);}));
 });
@@ -719,6 +721,7 @@ class Handler(BaseHTTPRequestHandler):
             body = body.encode()
         self.send_response(code)
         self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
