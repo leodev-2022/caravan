@@ -275,6 +275,14 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .ob-actions{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
 .ob-docs{color:var(--muted);font-size:13px}
 .ob-docs:hover{color:var(--accent)}
+.ob-cmdbox{max-width:680px;margin:22px auto 20px;text-align:left}
+.ob-cmdbox .joincmd{max-height:160px;margin-bottom:10px}
+.ob-cmdactions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px}
+.obempty{color:var(--muted)}
+details.adv{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+details.adv>summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;list-style:none}
+details.adv>summary:hover{color:var(--accent)}
+details.adv[open]>summary{margin-bottom:10px}
 .modal{position:fixed;inset:0;background:rgba(5,9,14,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modal[hidden]{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;width:min(600px,96vw);box-shadow:var(--shadow);max-height:92vh;overflow:auto}
@@ -312,13 +320,13 @@ JS = """
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
         save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
         nosub:"подключите первую машину",obtitle:"Подключите первую машину",
-        obsub:"Хаб готов. Добавьте машину — она появится здесь с живым статусом, метриками и кнопкой запуска агента.",
+        obsub:"Скопируйте команду и выполните её на новой машине — она появится здесь сама, с живым статусом и метриками.",
         obs1:"Выполните одну команду на машине",obs1d:"Кнопка «Подключить машину» выдаст одну строку — она сама поставит агент и введёт машину в защищённую сеть.",
         obs2:"Зарегистрируйте машину в портале",obs2d:"В конце установки машина покажет свой mesh-IP — нажмите «Добавить» и вставьте его.",
         obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         bar_run:"идёт",bar_ok:"готово",bar_err:"ошибка",
-        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
+        join:"Пригласить",jointitle:"Подключить машину",joinhint:"Скопируйте команду и выполните её на новой машине — она появится здесь сама.",jgenerate:"Новая команда",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",jwhere:"Linux/VM — вставьте в терминале. Proxmox LXC — на хосте pct enter <VMID>, затем вставьте.",advsum:"Продвинуто: подключить по SSH / ключом",obcopy:"Скопировать команду",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль SSH (необязательно)",provbtn:"Провизжинить по SSH",provname:"Имя узла",
         keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
@@ -327,13 +335,13 @@ JS = """
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
         save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
         nosub:"connect your first machine",obtitle:"Connect your first machine",
-        obsub:"Your hub is ready. Add a machine — it will show up here with live status, metrics and a one-click agent launcher.",
+        obsub:"Copy the command and run it on the new machine — it will appear here by itself, with live status and metrics.",
         obs1:"Run one command on the machine",obs1d:"The “Connect a machine” button gives you one line — it installs the agent and joins the secure network for you.",
         obs2:"Register the machine in the portal",obs2d:"At the end the machine prints its mesh IP — click Add and paste it.",
         obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
         bar_run:"in progress",bar_ok:"done",bar_err:"error",
-        join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
+        join:"Invite",jointitle:"Join a machine",joinhint:"Copy the command and run it on the new machine — it will show up here by itself.",jgenerate:"New command",jcopy:"Copy",joinempty:"Generate an invite first",jwhere:"Linux/VM — paste it in a terminal. Proxmox LXC — on the host run pct enter <VMID>, then paste.",advsum:"Advanced: connect over SSH / with a key",obcopy:"Copy command",
         provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"SSH password (optional)",provbtn:"Provision by SSH",provname:"Node name",
         keyhint:"…or add the hub public key to the new machine (authorized_keys, or the «SSH public key» field when creating a LXC/VM):",keycopy:"Copy key"}
   };
@@ -419,6 +427,8 @@ JS = """
     var tt=e.target.closest('#totop'); if(tt){window.scrollTo({top:0,behavior:'smooth'});return;}
     var ad=e.target.closest('#addbtn'); if(ad){openModal({});return;}
     var oba=e.target.closest('#obadd'); if(oba){openModal({});return;}
+    var obg=e.target.closest('#obgen'); if(obg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
+    var obc=e.target.closest('#obcopy'); if(obc){var c=(document.getElementById('obcmd').textContent||'').trim();if(c.indexOf('curl')<0){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(c).then(function(){toast(I18N[cur()].copied);});return;}
     var jb=e.target.closest('#joinbtn'); if(jb){document.getElementById('joinmodal').hidden=false;return;}
     var obi=e.target.closest('#objoin'); if(obi){document.getElementById('joinmodal').hidden=false;return;}
     var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
@@ -452,6 +462,10 @@ JS = """
     if(e.key==='Escape'){['modal','joinmodal'].forEach(function(id){var m=document.getElementById(id); if(m) m.hidden=true;});}
   });
   window.addEventListener('scroll',function(){var b=document.getElementById('totop'); if(b) b.hidden=window.scrollY<400;});
+  (function(){var oc=document.getElementById('obcmd');
+    if(oc&&(oc.textContent||'').indexOf('curl')<0&&!sessionStorage.getItem('cn_invite')){
+      sessionStorage.setItem('cn_invite','1'); post({action:'invite'},function(){});
+      setTimeout(function(){location.reload();},6000);}})();
   apply(cur()); setTheme(localStorage.getItem('cn_theme')||'dark');
   setInterval(poll,REFRESH); poll();
 })();
@@ -529,20 +543,27 @@ def render(data, statuses, ts):
           </div>
         </div>""")
         sections.append(f'<div class="groupwrap"><h2 class="group"><span class="dot"></span>{esc(loc)}<span class="chev">▾</span></h2><div class="grid">{"".join(cards)}</div></div>')
+    if invite_cmd:
+        cmd_html = f'<pre id="obcmd" class="joincmd">{esc(invite_cmd)}</pre>'
+    else:
+        cmd_html = ('<pre id="obcmd" class="joincmd obempty" data-i18n="joinempty">'
+                    'Сначала сгенерируйте приглашение</pre>')
     if sections:
         body = "".join(sections)
     else:
         body = f"""<section class="onboard" id="onboardwrap">
     <div class="ob-logo">{LOGO_SVG}</div>
     <h2 data-i18n="obtitle">Подключите первую машину</h2>
-    <p class="ob-sub" data-i18n="obsub">Хаб готов. Добавьте машину — она появится здесь с живым статусом, метриками и кнопкой запуска агента.</p>
-    <div class="ob-steps">
-      <div class="ob-step"><div class="ob-n">1</div><div class="ob-txt"><b data-i18n="obs1">Выполните одну команду на машине</b><span data-i18n="obs1d">Кнопка «Подключить машину» выдаст одну строку — она сама поставит агент и введёт машину в защищённую сеть.</span></div></div>
-      <div class="ob-step"><div class="ob-n">2</div><div class="ob-txt"><b data-i18n="obs2">Зарегистрируйте машину в портале</b><span data-i18n="obs2d">В конце установки машина покажет свой mesh-IP — нажмите «Добавить» и вставьте его.</span></div></div>
-      <div class="ob-step"><div class="ob-n">3</div><div class="ob-txt"><b data-i18n="obs3">Открывайте агента одним щелчком</b><span data-i18n="obs3d">CodeNomad или OpenCode прямо в браузере, откуда угодно.</span></div></div>
+    <p class="ob-sub" data-i18n="obsub">Скопируйте команду и выполните её на новой машине — она появится здесь сама, с живым статусом и метриками.</p>
+    <div class="ob-cmdbox">
+      {cmd_html}
+      <div class="ob-cmdactions">
+        <button id="obgen" class="mini" data-i18n="jgenerate">Новая команда</button>
+        <button id="obcopy" class="addbtn" data-i18n="obcopy">Скопировать команду</button>
+      </div>
+      <p class="hint" data-i18n="jwhere">Linux/VM — вставьте в терминале. Proxmox LXC — на хосте <code>pct enter &lt;VMID&gt;</code>, затем вставьте.</p>
     </div>
     <div class="ob-actions">
-      <button id="objoin" class="addbtn" data-i18n="objoinbtn">Подключить машину</button>
       <button id="obadd" class="iconbtn2" data-i18n="obaddman">Добавить по mesh-IP</button>
       <a class="ob-docs" href="{DOCS_URL}" target="_blank" rel="noopener" data-i18n="obdocs">Как это работает →</a>
     </div>
@@ -604,27 +625,31 @@ def render(data, statuses, ts):
 </div></div>
 <div id="joinmodal" class="modal" hidden><div class="box">
   <h3 data-i18n="jointitle">Подключить машину</h3>
-  <p class="hint" data-i18n="joinhint">Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».</p>
+  <p class="hint" data-i18n="joinhint">Скопируйте команду и выполните её на новой машине — она появится здесь сама.</p>
   <pre id="joincmd" class="joincmd">{esc(invite_cmd)}</pre>
   <div class="modalactions">
-    <button id="jgen" class="mini" data-i18n="jgenerate">Сгенерировать</button>
+    <button id="jgen" class="mini" data-i18n="jgenerate">Новая команда</button>
     <button id="jcopy" class="open" data-i18n="jcopy">Копировать</button>
     <button id="jclose" class="mini" data-i18n="cancel">Закрыть</button>
   </div>
-  <div class="prov">
-    {key_block}
-    <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба; пароль можно оставить пустым — тогда используется ключ хаба):</p>
-    <div class="grid2">
-      <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10"></div>
-      <div class="row"><label>ssh user</label><input id="p-user" placeholder="root"></div>
-      <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="off"></div>
-      <div class="row"><label data-i18n="provname">Имя узла</label><input id="p-name" placeholder="node1"></div>
+  <p class="hint" data-i18n="jwhere">Linux/VM — вставьте в терминале. Proxmox LXC — на хосте <code>pct enter &lt;VMID&gt;</code>, затем вставьте.</p>
+  <details class="adv">
+    <summary data-i18n="advsum">Продвинуто: подключить по SSH / ключом</summary>
+    <div class="prov">
+      {key_block}
+      <p class="hint" data-i18n="provhint">…или поднимите узел по SSH (машина должна быть достижима с хаба; пароль можно оставить пустым — тогда используется ключ хаба):</p>
+      <div class="grid2">
+        <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10" autocomplete="off"></div>
+        <div class="row"><label>ssh user</label><input id="p-user" placeholder="root" autocomplete="off"></div>
+        <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="new-password"></div>
+        <div class="row"><label data-i18n="provname">Имя узла</label><input id="p-name" placeholder="node1" autocomplete="off"></div>
+      </div>
+      <div class="grid2">
+        <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
+        <div class="row" style="justify-content:flex-end"><button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button></div>
+      </div>
     </div>
-    <div class="grid2">
-      <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
-      <div class="row" style="justify-content:flex-end"><button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button></div>
-    </div>
-  </div>
+  </details>
 </div></div>
 <button id="totop" class="totop" hidden title="↑">↑</button>
 <script>{JS.replace('__REFRESH__', str(REFRESH))}</script>

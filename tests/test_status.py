@@ -50,8 +50,21 @@ class StatusTest(unittest.TestCase):
         status = load_status()
         html = status.render({"domain": "example.com", "envs": []}, {}, 0)
         self.assertIn('class="onboard"', html)
-        self.assertIn('id="objoin"', html)
+        self.assertIn('id="obcmd"', html)
         self.assertNotIn('id="q"', html)
+
+    def test_onboarding_shows_the_ready_invite_command(self):
+        status = load_status()
+        old = status.REQUESTS_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                with open(os.path.join(d, "invite.txt"), "w", encoding="utf-8") as fh:
+                    fh.write("curl -fsSL x | sudo bash")
+                status.REQUESTS_DIR = d
+                html = status.render({"domain": "example.com", "envs": []}, {}, 0)
+        finally:
+            status.REQUESTS_DIR = old
+        self.assertIn("curl -fsSL x | sudo bash", html)
 
     def test_provision_key_shown_only_when_present(self):
         status = load_status()

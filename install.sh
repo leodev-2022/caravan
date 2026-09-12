@@ -483,6 +483,9 @@ main() {
   start_stack
   join_hub_mesh
   register_admin_totp
+  # pre-mint a join command so the dashboard shows it ready to copy (no step)
+  bash "$CARAVAN_DIR/tools/invite.sh" --expiry 24h \
+    --write "$CARAVAN_DIR/requests/invite.txt" >/dev/null 2>&1 || true
   print_summary
   log "stage done: docker + compose + secrets + .env + stack + configs (tls=$TLS_MODE)"
 }
