@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 import yaml
 
@@ -14,17 +15,25 @@ REQ = os.path.join(BASE, "requests")
 CFG = os.path.join(BASE, "nodes.yaml")
 
 
+def _apply_status(**kw):
+    """Record the last apply's state so the portal can show live progress."""
+    try:
+        os.makedirs(os.path.join(BASE, "state"), exist_ok=True)
+        with open(os.path.join(BASE, "state", "apply.json"), "w", encoding="utf-8") as f:
+            json.dump(kw, f, ensure_ascii=False)
+    except OSError:
+        pass
+
+
 def handle_provision(base, req):
-    """Provision a reachable machine over SSH (tools/provision.sh)."""
+    """Provision a reachable machine over SSH. Returns (ok, short_message)."""
     script = os.path.join(base, "tools", "provision.sh")
     if not os.path.exists(script):
-        print("[apply] provision: tools/provision.sh not found")
-        return
+        return False, "tools/provision.sh not found"
     host = str(req.get("host", "")).strip()
     user = str(req.get("user", "")).strip()
     if not host or not user:
-        print("[apply] provision: host & user required")
-        return
+        return False, "host & user required"
     args = ["bash", script, "--dir", base, "--host", host, "--user", user]
     if req.get("name"):
         args += ["--name", str(req["name"])]
@@ -38,12 +47,18 @@ def handle_provision(base, req):
     # else: provision.sh falls back to the hub's provisioning key
     try:
         r = subprocess.run(args, capture_output=True, text=True, timeout=1800, env=env)
-        for line in (r.stdout or "").strip().splitlines()[-6:]:
+        tail = [ln for ln in (r.stdout or "").strip().splitlines() if ln.strip()]
+        for line in tail[-6:]:
             print("[apply] provision:", line)
         if r.returncode != 0:
-            print("[apply] provision failed:", (r.stderr or "").strip()[:200])
+            msg = (tail[-1] if tail else "") or (r.stderr or "").strip()[:200]
+            print("[apply] provision failed:", msg[:200])
+            return False, msg[:300]
+        reg = next((ln for ln in reversed(tail) if "->" in ln), "done")
+        return True, reg[:300]
     except Exception as e:
         print("[apply] provision error:", e)
+        return False, str(e)[:300]
 
 
 def handle_invite(base, req_dir):
@@ -115,20 +130,23 @@ def main():
             print(f"[apply] bad request {fn}: {e}")
             os.remove(fn)
             continue
-        if req.get("action") == "invite":
+        action = req.get("action", "add")
+        label = ((req.get("env") or {}).get("name") or req.get("name")
+                 or req.get("host") or "")
+        _apply_status(status="running", action=action, name=label, started=time.time())
+        ok, msg = True, ""
+        if action == "invite":
             handle_invite(BASE, REQ)
-            os.remove(fn)
-            continue
-        if req.get("action") == "provision":
-            handle_provision(BASE, req)
-            os.remove(fn)
-            continue
-        envs, ch = apply_one(envs, req)
-        if ch:
-            changed = True
-            name = req.get("env", {}).get("name") or req.get("name")
-            print(f"[apply] {req.get('action', 'add')} {name}")
+        elif action == "provision":
+            ok, msg = handle_provision(BASE, req)
+        else:
+            envs, ch = apply_one(envs, req)
+            if ch:
+                changed = True
+                print(f"[apply] {action} {label}")
         os.remove(fn)
+        _apply_status(status=("ok" if ok else "error"), action=action, name=label,
+                      message=msg, finished=time.time())
     if changed:
         data["envs"] = envs
         save(data)

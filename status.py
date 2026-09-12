@@ -84,6 +84,13 @@ def save_state():
     except Exception:
         pass
 
+def load_apply():
+    try:
+        with open(os.path.join(os.path.dirname(STATE_FILE), "apply.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
 def check(ip, port):
     t0 = time.time()
     try:
@@ -247,6 +254,12 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .aliases a{margin-right:12px}
 .foot{color:var(--muted);font-size:12px;margin-top:auto;padding-top:36px;text-align:center}
 .empty{color:var(--muted);padding:24px;text-align:center}
+.applybar{padding:10px 14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel);
+  font-size:13.5px;font-weight:600;margin-bottom:14px;display:flex;gap:10px;align-items:center;line-height:1.4}
+.applybar.run{border-color:var(--accent)}
+.applybar.ok{border-color:var(--ok)}
+.applybar.err{border-color:var(--down);color:var(--down)}
+.applybar[hidden]{display:none}
 .onboard{max-width:720px;margin:7vh auto 0;text-align:center;padding:8px 4px}
 .ob-logo{display:inline-flex;align-items:center;justify-content:center;width:76px;height:76px;border-radius:20px;
   background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);box-shadow:var(--shadow)}
@@ -304,6 +317,7 @@ JS = """
         obs2:"Зарегистрируйте машину в портале",obs2d:"В конце установки машина покажет свой mesh-IP — нажмите «Добавить» и вставьте его.",
         obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
+        bar_run:"идёт",bar_ok:"готово",bar_err:"ошибка",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo; пароль можно оставить пустым — тогда используется ключ хаба):",provpass:"Пароль SSH (необязательно)",provbtn:"Провизжинить по SSH",provname:"Имя узла",
         keyhint:"…или добавьте публичный ключ хаба на новую машину (authorized_keys, либо поле «SSH public key» при создании LXC/VM):",keycopy:"Копировать ключ"},
@@ -318,6 +332,7 @@ JS = """
         obs2:"Register the machine in the portal",obs2d:"At the end the machine prints its mesh IP — click Add and paste it.",
         obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
+        bar_run:"in progress",bar_ok:"done",bar_err:"error",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
         provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo; leave the password blank to use the hub key):",provpass:"SSH password (optional)",provbtn:"Provision by SSH",provname:"Node name",
         keyhint:"…or add the hub public key to the new machine (authorized_keys, or the «SSH public key» field when creating a LXC/VM):",keycopy:"Copy key"}
@@ -366,6 +381,17 @@ JS = """
     document.getElementById('modal').hidden=false;
   }
   function upd(d){
+    var known=Object.keys(d.envs||{}).length;
+    var cards=document.querySelectorAll('.card').length;
+    var onboarding=!!document.getElementById('onboardwrap');
+    if((onboarding&&known>0)||(!onboarding&&known!==cards)){location.reload();return;}
+    var ab=document.getElementById('applybar');
+    if(ab){var ap=d.apply||{};var as=ap.status||'';
+      if(as==='running'){ab.hidden=false;ab.className='applybar run';ab.textContent='\u23f3 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_run+' \u00b7 '+humanize(Date.now()/1000-(ap.started||Date.now()/1000));}
+      else if(as==='error'){ab.hidden=false;ab.className='applybar err';ab.textContent='\u26a0 '+(ap.name?ap.name+': ':'')+(ap.message||I18N[cur()].bar_err);}
+      else if(as==='ok'&&ap.finished&&(Date.now()/1000-ap.finished)<180){ab.hidden=false;ab.className='applybar ok';ab.textContent='\u2713 '+(ap.name||'')+' \u2014 '+I18N[cur()].bar_ok;}
+      else{ab.hidden=true;}
+    }
     var el=document.getElementById('utime');
     if(el) el.textContent=new Date((d.ts||Date.now()/1000)*1000).toLocaleTimeString();
     for(var n in d.envs){var p=document.getElementById('st-'+n); if(!p) continue; var s=d.envs[n];
@@ -506,7 +532,7 @@ def render(data, statuses, ts):
     if sections:
         body = "".join(sections)
     else:
-        body = f"""<section class="onboard">
+        body = f"""<section class="onboard" id="onboardwrap">
     <div class="ob-logo">{LOGO_SVG}</div>
     <h2 data-i18n="obtitle">Подключите первую машину</h2>
     <p class="ob-sub" data-i18n="obsub">Хаб готов. Добавьте машину — она появится здесь с живым статусом, метриками и кнопкой запуска агента.</p>
@@ -556,6 +582,7 @@ def render(data, statuses, ts):
   </div>
 </header>
 <div class="wrap">
+  <div id="applybar" class="applybar" hidden></div>
   {body}
   <div class="foot"><a href="https://{esc(domain)}/">{esc(domain)}</a></div>
 </div>
@@ -644,6 +671,7 @@ def refresh_loop():
             with _lock:
                 _cache["html"] = html
                 _cache["statuses"] = statuses
+                _cache["apply"] = load_apply()
                 _cache["ts"] = time.time()
         except Exception as e:
             with _lock:
@@ -663,7 +691,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/status.json":
             with _lock:
-                payload = {"ts": _cache["ts"], "envs": _cache["statuses"]}
+                payload = {"ts": _cache["ts"], "envs": _cache["statuses"],
+                           "apply": _cache.get("apply", {})}
             self._send(200, "application/json", json.dumps(payload))
         elif path == "/favicon.ico":
             self._send(200, "image/svg+xml", LOGO_SVG)

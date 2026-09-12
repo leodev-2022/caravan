@@ -64,6 +64,10 @@ prints the dashboard URL and a one-time admin password.
 
 ### 2. Connect a machine (node)
 
+> **Easiest, and the only path that always works:** run **one command** on the new
+> machine. On a Proxmox **LXC** run it **inside the container console**
+> (`pct enter <VMID>` on the host) — no SSH, no password, no keys.
+
 **Option A — one command (works everywhere, no SSH needed).**
 In the dashboard click **Invite → Generate** and copy the one line; run it on the
 new machine as root:
