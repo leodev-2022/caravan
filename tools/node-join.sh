@@ -376,14 +376,13 @@ stt_recommend() {
   local cpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cpu"
   local gpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cuda"
   REC_SAFE=0
+  # CPU-only: large-v3 is impractically slow, so cap the recommendation at medium.
   if [ -n "$GPU" ]; then
     REC_MODEL="large-v3"; REC_IMAGE="$gpu_img"; REC_VERDICT="strongly recommended (GPU)"; REC_SAFE=1
-  elif [ "$RAM_MB" -ge 24000 ]; then
-    REC_MODEL="large-v3"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended"; REC_SAFE=1
-  elif [ "$RAM_MB" -ge 12000 ]; then
-    REC_MODEL="medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended"; REC_SAFE=1
+  elif [ "$RAM_MB" -ge 16000 ]; then
+    REC_MODEL="medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 8000 ]; then
-    REC_MODEL="small"; REC_IMAGE="$cpu_img"; REC_VERDICT="ok (may compete with your work)"
+    REC_MODEL="small"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
   elif [ "$RAM_MB" -ge 4000 ]; then
     REC_MODEL="base"; REC_IMAGE="$cpu_img"; REC_VERDICT="tight for this machine"
   else
