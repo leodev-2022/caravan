@@ -16,6 +16,7 @@ STATE_FILE = os.environ.get("STATE_FILE", "/data/state/status.json")
 REFRESH = int(os.environ.get("PORTAL_REFRESH", "10"))
 TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TG_CHAT = os.environ.get("TELEGRAM_CHAT", "")
+DOCS_URL = os.environ.get("DOCS_URL", "https://github.com/leodev-2022/caravan#quick-start")
 
 LOGO_SVG = ('<svg width="44" height="44" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">'
             '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
@@ -246,6 +247,21 @@ h2.group.collapsed .chev{transform:rotate(-90deg)}
 .aliases a{margin-right:12px}
 .foot{color:var(--muted);font-size:12px;margin-top:auto;padding-top:36px;text-align:center}
 .empty{color:var(--muted);padding:24px;text-align:center}
+.onboard{max-width:720px;margin:7vh auto 0;text-align:center;padding:8px 4px}
+.ob-logo{display:inline-flex;align-items:center;justify-content:center;width:76px;height:76px;border-radius:20px;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);box-shadow:var(--shadow)}
+.onboard h2{font-size:26px;margin:20px 0 8px;letter-spacing:-.01em}
+.ob-sub{color:var(--muted);font-size:15px;line-height:1.55;margin:0 auto;max-width:520px}
+.ob-steps{display:grid;gap:12px;margin:28px 0;text-align:left}
+.ob-step{display:flex;gap:14px;align-items:flex-start;background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.ob-n{flex:0 0 28px;width:28px;height:28px;border-radius:999px;background:var(--accent);color:var(--accent-ink);
+  font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center}
+.ob-txt b{display:block;font-size:15px;margin-bottom:3px}
+.ob-txt span{color:var(--muted);font-size:13.5px;line-height:1.5}
+.ob-actions{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+.ob-docs{color:var(--muted);font-size:13px}
+.ob-docs:hover{color:var(--accent)}
 .modal{position:fixed;inset:0;background:rgba(5,9,14,.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modal[hidden]{display:none}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;width:min(520px,96vw);box-shadow:var(--shadow)}
@@ -277,14 +293,26 @@ JS = """
         envs:"окружений",open:"Открыть",copyurl:"копировать URL",copyip:"копировать IP",copied:"скопировано",
         tags:"теги",online_for:"в сети",offline_for:"недоступен",os_up:"аптайм ОС",all:"Все",add:"Добавить",addtitle:"Добавить окружение",edittitle:"Изменить окружение",flabel:"Метка",flocation:"Место",
         ftags:"Теги (через запятую)",faliases:"Алиасы (через запятую)",fhint:"Сначала поднимите узел на машине (node-join.sh), затем введите его mesh-IP.",
-        save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",firstrun:"Пока нет окружений. Нажмите «Добавить» или «Пригласить», чтобы подключить первую машину.",
+        save:"Сохранить",cancel:"Отмена",delete:"Удалить",edit:"Изменить",delconfirm:"Удалить окружение",applying:"Применяю… страница обновится",empty:"Ничего не найдено",
+        nosub:"подключите первую машину",obtitle:"Подключите первую машину",
+        obsub:"Хаб готов. Добавьте машину — она появится здесь с живым статусом, метриками и кнопкой запуска агента.",
+        obs1:"Выполните одну команду на машине",obs1d:"Кнопка «Подключить машину» выдаст одну строку — она сама поставит агент и введёт машину в защищённую сеть.",
+        obs2:"Зарегистрируйте машину в портале",obs2d:"В конце установки машина покажет свой mesh-IP — нажмите «Добавить» и вставьте его.",
+        obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
+        objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
         provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
         tags:"tags",online_for:"online for",offline_for:"down for",os_up:"os uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
         ftags:"Tags (comma-separated)",faliases:"Aliases (comma-separated)",fhint:"First onboard the machine (node-join.sh), then enter its mesh IP.",
-        save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",firstrun:"No environments yet. Click Add or Invite to connect your first machine.",
+        save:"Save",cancel:"Cancel",delete:"Delete",edit:"Edit",delconfirm:"Delete environment",applying:"Applying… page will refresh",empty:"Nothing found",
+        nosub:"connect your first machine",obtitle:"Connect your first machine",
+        obsub:"Your hub is ready. Add a machine — it will show up here with live status, metrics and a one-click agent launcher.",
+        obs1:"Run one command on the machine",obs1d:"The “Connect a machine” button gives you one line — it installs the agent and joins the secure network for you.",
+        obs2:"Register the machine in the portal",obs2d:"At the end the machine prints its mesh IP — click Add and paste it.",
+        obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
+        objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
         provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo):",provpass:"SSH password",provbtn:"Provision by SSH"}
   };
@@ -358,7 +386,9 @@ JS = """
     var th=e.target.closest('#themebtn'); if(th){var c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');return;}
     var tt=e.target.closest('#totop'); if(tt){window.scrollTo({top:0,behavior:'smooth'});return;}
     var ad=e.target.closest('#addbtn'); if(ad){openModal({});return;}
+    var oba=e.target.closest('#obadd'); if(oba){openModal({});return;}
     var jb=e.target.closest('#joinbtn'); if(jb){document.getElementById('joinmodal').hidden=false;return;}
+    var obi=e.target.closest('#objoin'); if(obi){document.getElementById('joinmodal').hidden=false;return;}
     var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
     var jg=e.target.closest('#jgen'); if(jg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
     var jcp=e.target.closest('#jcopy'); if(jcp){var t=(document.getElementById('joincmd').textContent||'').trim();if(!t){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(t).then(function(){toast(I18N[cur()].copied);});return;}
@@ -407,7 +437,8 @@ def render(data, statuses, ts):
         loc = e.get("location", "") or "—"
         if loc not in locs:
             locs.append(loc)
-    chips = ['<button class="chipf active" data-location="all" data-i18n="all">Все</button>']
+    chips = (['<button class="chipf active" data-location="all" data-i18n="all">Все</button>']
+             if envs else [])
     for loc in locs:
         chips.append(f'<button class="chipf" data-location="{esc(loc)}">{esc(loc)}</button>')
     groups = {}
@@ -464,7 +495,30 @@ def render(data, statuses, ts):
           </div>
         </div>""")
         sections.append(f'<div class="groupwrap"><h2 class="group"><span class="dot"></span>{esc(loc)}<span class="chev">▾</span></h2><div class="grid">{"".join(cards)}</div></div>')
-    body = "".join(sections) if sections else '<div class="empty" data-i18n="firstrun">Пока нет окружений. Нажмите «Добавить» или «Пригласить», чтобы подключить первую машину.</div>'
+    if sections:
+        body = "".join(sections)
+    else:
+        body = f"""<section class="onboard">
+    <div class="ob-logo">{LOGO_SVG}</div>
+    <h2 data-i18n="obtitle">Подключите первую машину</h2>
+    <p class="ob-sub" data-i18n="obsub">Хаб готов. Добавьте машину — она появится здесь с живым статусом, метриками и кнопкой запуска агента.</p>
+    <div class="ob-steps">
+      <div class="ob-step"><div class="ob-n">1</div><div class="ob-txt"><b data-i18n="obs1">Выполните одну команду на машине</b><span data-i18n="obs1d">Кнопка «Подключить машину» выдаст одну строку — она сама поставит агент и введёт машину в защищённую сеть.</span></div></div>
+      <div class="ob-step"><div class="ob-n">2</div><div class="ob-txt"><b data-i18n="obs2">Зарегистрируйте машину в портале</b><span data-i18n="obs2d">В конце установки машина покажет свой mesh-IP — нажмите «Добавить» и вставьте его.</span></div></div>
+      <div class="ob-step"><div class="ob-n">3</div><div class="ob-txt"><b data-i18n="obs3">Открывайте агента одним щелчком</b><span data-i18n="obs3d">CodeNomad или OpenCode прямо в браузере, откуда угодно.</span></div></div>
+    </div>
+    <div class="ob-actions">
+      <button id="objoin" class="addbtn" data-i18n="objoinbtn">Подключить машину</button>
+      <button id="obadd" class="iconbtn2" data-i18n="obaddman">Добавить по mesh-IP</button>
+      <a class="ob-docs" href="{DOCS_URL}" target="_blank" rel="noopener" data-i18n="obdocs">Как это работает →</a>
+    </div>
+  </section>"""
+    sub_html = (f'{len(envs)} <span data-i18n="envs">окружений</span>' if envs
+                else '<span data-i18n="nosub">подключите первую машину</span>')
+    search_html = ("""<div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="q" type="text" data-i18n-ph="filter" placeholder="Фильтр: имя, место, тег… (клавиша /)">
+      </div>""" if envs else '')
     return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="{FAVICON}">
@@ -476,15 +530,12 @@ def render(data, statuses, ts):
 <header class="topbar"><div class="topbar-in">
     <div class="brand">{LOGO_SVG}
       <div><div class="name">Cara<span>van</span></div>
-      <div class="sub">{len(envs)} <span data-i18n="envs">окружений</span></div></div>
+      <div class="sub">{sub_html}</div></div>
     </div>
     <div class="ctrls">
       <button id="joinbtn" class="iconbtn2" data-i18n="join">Пригласить</button>
       <button id="addbtn" class="addbtn">+ <span data-i18n="add">Добавить</span></button>
-      <div class="search">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-        <input id="q" type="text" data-i18n-ph="filter" placeholder="Фильтр: имя, место, тег… (клавиша /)">
-      </div>
+      {search_html}
       <button id="langtoggle" class="iconbtn2" title="RU / EN">EN</button>
       <button id="themebtn" class="iconbtn2" title="theme">☾</button>
     </div>
