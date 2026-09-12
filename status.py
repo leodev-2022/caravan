@@ -301,7 +301,7 @@ JS = """
         obs3:"Открывайте агента одним щелчком",obs3d:"CodeNomad или OpenCode прямо в браузере, откуда угодно.",
         objoinbtn:"Подключить машину",obaddman:"Добавить по mesh-IP",obdocs:"Как это работает →",
         join:"Пригласить",jointitle:"Подключить машину",joinhint:"Выполните эту одну строку на новой машине (без флагов). Пусто? Нажмите «Сгенерировать».",jgenerate:"Сгенерировать",jcopy:"Копировать",joinempty:"Сначала сгенерируйте приглашение",
-        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH"},
+        provhint:"…или поднимите узел по SSH (машина достижима с хаба; root или passwordless-sudo):",provpass:"Пароль SSH",provbtn:"Провизжинить по SSH",provname:"Имя узла"},
     en:{filter:"Filter: name, location, tag… (press /)",updated:"updated",autorefresh:"auto-refresh",
         envs:"environments",open:"Open",copyurl:"copy URL",copyip:"copy IP",copied:"copied",
         tags:"tags",online_for:"online for",offline_for:"down for",os_up:"os uptime",all:"All",add:"Add",addtitle:"Add environment",edittitle:"Edit environment",flabel:"Label",flocation:"Location",
@@ -314,7 +314,7 @@ JS = """
         obs3:"Launch the agent in one click",obs3d:"CodeNomad or OpenCode right in your browser, from anywhere.",
         objoinbtn:"Connect a machine",obaddman:"Add by mesh IP",obdocs:"How it works →",
         join:"Invite",jointitle:"Join a machine",joinhint:"Run this one line on the new machine (no flags). Empty? Click Generate invite.",jgenerate:"Generate invite",jcopy:"Copy",joinempty:"Generate an invite first",
-        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo):",provpass:"SSH password",provbtn:"Provision by SSH"}
+        provhint:"…or provision a node over SSH (reachable from the hub; root or passwordless-sudo):",provpass:"SSH password",provbtn:"Provision by SSH",provname:"Node name"}
   };
   function cur(){return localStorage.getItem('cn_lang')||'ru';}
   function humanize(sec){sec=Math.max(0,sec|0);if(sec<60)return sec+'s';if(sec<3600)return Math.floor(sec/60)+'m';if(sec<86400)return Math.floor(sec/3600)+'h';return Math.floor(sec/86400)+'d';}
@@ -392,7 +392,7 @@ JS = """
     var jc=e.target.closest('#jclose'); if(jc){document.getElementById('joinmodal').hidden=true;return;}
     var jg=e.target.closest('#jgen'); if(jg){post({action:'invite'},function(){toast(I18N[cur()].applying);setTimeout(function(){location.reload();},7000);});return;}
     var jcp=e.target.closest('#jcopy'); if(jcp){var t=(document.getElementById('joincmd').textContent||'').trim();if(!t){toast(I18N[cur()].joinempty);return;}navigator.clipboard.writeText(t).then(function(){toast(I18N[cur()].copied);});return;}
-    var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw},function(){toast(I18N[cur()].applying);});return;}
+    var pp=e.target.closest('#pprov'); if(pp){var ph=(document.getElementById('p-host').value||'').trim();var pu=(document.getElementById('p-user').value||'').trim();var pw=document.getElementById('p-pass').value||'';var pn=(document.getElementById('p-name').value||'').trim();var pe=document.getElementById('p-engine').value||'';if(!ph||!pu){alert('host & user required');return;}post({action:'provision',host:ph,user:pu,password:pw,name:pn,engine:pe},function(){toast(I18N[cur()].applying);});return;}
     var ed=e.target.closest('[data-edit]'); if(ed){ var c=ed.closest('.card');
       openModal({name:c.getAttribute('data-name'),ip:c.getAttribute('data-ip'),port:c.getAttribute('data-port'),
         label:c.getAttribute('data-label'),location:c.getAttribute('data-location'),engine:c.getAttribute('data-engine'),
@@ -579,6 +579,8 @@ def render(data, statuses, ts):
     <div class="row"><label>host</label><input id="p-host" placeholder="203.0.113.10"></div>
     <div class="row"><label>ssh user</label><input id="p-user" placeholder="root"></div>
     <div class="row"><label data-i18n="provpass">Пароль SSH</label><input id="p-pass" type="password" autocomplete="off"></div>
+    <div class="row"><label data-i18n="provname">Имя узла</label><input id="p-name" placeholder="node1"></div>
+    <div class="row"><label>engine</label><select id="p-engine"><option value="">codenomad</option><option value="opencode">opencode</option></select></div>
     <button id="pprov" class="mini" data-i18n="provbtn">Provision by SSH</button>
   </div>
 </div></div>
