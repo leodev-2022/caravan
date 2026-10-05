@@ -1,0 +1,9 @@
+[Unit]
+Description=Caravan — auto-register new mesh nodes
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=CARAVAN_DIR=__CARAVAN_DIR__
+ExecStart=/usr/bin/python3 __CARAVAN_DIR__/tools/sync-nodes.py

@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# caravan — Caravan hub CLI (thin wrapper over the installer/scripts).
+#   sudo caravan install --domain example.com
+#   sudo caravan update
+#   sudo caravan doctor
+#   sudo caravan nodes list
+#   sudo caravan token --expiry 1h
+#   sudo caravan uninstall [--purge]
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib.sh
+. "$HERE/scripts/lib.sh"
+
+HS_CONTAINER="${HS_CONTAINER:-headscale}"
+
+usage() {
+  cat <<'EOF'
+caravan — self-hosted AI coding cockpit
+
+Usage: sudo caravan <command> [options]
+
+Commands:
+  install [--domain NAME | --sslip | --self-signed]   install the hub
+  update                                              pull images + re-apply
+  doctor                                              diagnose the hub
+  nodes list                                          list mesh nodes
+  token [--user NAME|ID] [--expiry 1h] [--reusable]   issue a node join token
+  add-node --name N --ip IP [--port 9898] [...]       register a node
+  remove-node --name N                                unregister a node
+  backup [--dir DIR] [--out DIR]                      back up configs + volumes
+  restore --file ARCHIVE [--dir DIR]                  restore from a backup
+  uninstall [--purge] [--remove-docker]               remove the hub
+  version                                             print the version
+
+Run "caravan <command> --help" for command options.
+EOF
+}
+
+version() {
+  local v="dev"
+  [ -f "$HERE/VERSION" ] && v="$(tr -d '[:space:]' < "$HERE/VERSION")"
+  echo "caravan $v"
+}
+
+require_docker() {
+  have docker || die "docker not found — run this on the hub"
+  docker ps --format '{{.Names}}' | grep -qx "$HS_CONTAINER" ||
+    die "headscale container '$HS_CONTAINER' is not running"
+}
+
+cmd_nodes() {
+  local sub="${1:-list}"
+  case "$sub" in
+    list)
+      require_docker
+      local py
+      py="$(mktemp)"
+      cat > "$py" <<'PY'
+import datetime
+import json
+import sys
+
+
+def ts(v):
+    if isinstance(v, dict) and "seconds" in v:
+        return datetime.datetime.fromtimestamp(v["seconds"], datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+    return "-"
+
+
+nodes = json.load(sys.stdin)
+print(f"  {'NAME':<16} {'IP':<14} {'STATE':<8} LAST SEEN (UTC)")
+for n in sorted(nodes, key=lambda x: x.get("id", 0)):
+    ips = [i for i in (n.get("ip_addresses") or []) if ":" not in i]
+    state = "online" if n.get("online") else "offline"
+    print(f"  {n.get('name', '?'):<16} {(ips[0] if ips else '-'):<14} {state:<8} {ts(n.get('last_seen'))}")
+PY
+      docker exec "$HS_CONTAINER" headscale nodes list -o json 2>/dev/null | python3 "$py"
+      rm -f "$py"
+      ;;
+    *)
+      echo "usage: caravan nodes list" >&2
+      return 1
+      ;;
+  esac
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift || true
+
+case "$cmd" in
+  install) exec bash "$HERE/install.sh" "$@" ;;
+  update) exec bash "$HERE/install.sh" --update "$@" ;;
+  doctor) exec bash "$HERE/scripts/doctor.sh" "$@" ;;
+  nodes) cmd_nodes "$@" ;;
+  token) exec bash "$HERE/tools/invite.sh" "$@" ;;
+  add-node) exec bash "$HERE/tools/add-node.sh" "$@" ;;
+  remove-node) exec bash "$HERE/tools/remove-node.sh" "$@" ;;
+  backup) exec bash "$HERE/tools/backup.sh" "$@" ;;
+  restore) exec bash "$HERE/tools/restore.sh" "$@" ;;
+  uninstall) exec bash "$HERE/scripts/uninstall.sh" "$@" ;;
+  version | --version | -v) version ;;
+  "" | help | --help | -h) usage ;;
+  *)
+    printf 'caravan: unknown command: %s\n\n' "$cmd" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
