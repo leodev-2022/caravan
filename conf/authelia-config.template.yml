@@ -1,0 +1,45 @@
+# Authelia configuration template (v4.39) — rendered by install.sh into
+# authelia/configuration.yml. DOMAIN comes from caravan.env; the jwt/session/
+# encryption secrets come from secrets.env.
+host: 0.0.0.0
+port: 9091
+log_level: info
+jwt_secret: "__JWT_SECRET__"
+totp:
+  issuer: __DOMAIN__
+  period: 30
+  skew: 1
+authentication_backend:
+  file:
+    path: /config/users_database.yml
+access_control:
+  default_policy: deny
+  rules:
+    - domain: auth.__DOMAIN__
+      policy: bypass
+    - domain: hub.__DOMAIN__
+      policy: two_factor
+    - domain: '*.__DOMAIN__'
+      policy: two_factor
+    - domain: __DOMAIN__
+      policy: two_factor
+session:
+  name: authelia_session
+  secret: "__SESSION_SECRET__"
+  expiration: 1h
+  remember_me_duration: 30d
+  cookies:
+    - domain: __DOMAIN__
+      default_redirection_url: https://hub.__DOMAIN__
+      authelia_url: https://auth.__DOMAIN__
+storage:
+  encryption_key: "__ENCRYPTION_KEY__"
+  local:
+    path: /config/db.sqlite
+regulation:
+  max_retries: 5
+  find_time: 2m
+  ban_time: 5m
+notifier:
+  filesystem:
+    filename: /config/notification.txt
