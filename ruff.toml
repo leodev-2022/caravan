@@ -1,0 +1,11 @@
+# ruff configuration — deterministic across local machines and CI.
+line-length = 120
+target-version = "py310"
+
+[lint]
+# Curated rule set (pycodestyle, pyflakes, isort, pyupgrade, bugbear, simplify, ruff).
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+# BLE001: the portal / request-applier intentionally catch broadly so a single
+# failure never crashes the whole service. E501: long lines in embedded CSS/HTML.
+# RUF001-003: the UI is localized (Cyrillic strings are intentional).
+ignore = ["BLE001", "E501", "RUF001", "RUF002", "RUF003"]
