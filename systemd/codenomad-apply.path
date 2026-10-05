@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for Caravan hub change requests
+After=network-online.target
+
+[Path]
+PathChanged=__CARAVAN_DIR__/requests
+
+[Install]
+WantedBy=multi-user.target

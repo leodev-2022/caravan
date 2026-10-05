@@ -1,0 +1,708 @@
+#!/usr/bin/env bash
+# node-join.sh — join a (Ubuntu/Debian) machine to a Caravan hub as a node.
+# Idempotent. Run as root (or with sudo).
+#
+#   sudo bash node-join.sh \
+#     --hub https://mesh.example.com --token hskey-auth-XXXX \
+#     --name web1 --user dev --workspace-root /opt --bypass-vpn --stt
+#
+# After it finishes, note the mesh IPv4 shown and register it on the hub
+# (portal "add env" or nodes.yaml + generate_caddy.py).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# Self-bootstrap: when run via `curl ... | sudo bash -s -- ...`, the repo files
+# are not next to us — fetch the repo and re-exec from there.
+if [ ! -f "$HERE/lib.sh" ] && [ ! -f "$HERE/../scripts/lib.sh" ]; then
+  _tarball="${CARAVAN_TARBALL:-https://github.com/leodev-2022/caravan/archive/refs/heads/main.tar.gz}"
+  _tmp="$(mktemp -d)"
+  echo "[caravan] fetching $_tarball"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$_tarball" | tar xz -C "$_tmp"
+  else
+    wget -qO- "$_tarball" | tar xz -C "$_tmp"
+  fi
+  _script="$(ls -d "$_tmp"/caravan-*/tools/node-join.sh | head -n1)"
+  exec bash "$_script" "$@"
+fi
+
+if [ -f "$HERE/lib.sh" ]; then
+  # shellcheck source=lib.sh
+  . "$HERE/lib.sh"
+else
+  # shellcheck source=../scripts/lib.sh
+  . "$HERE/../scripts/lib.sh"
+fi
+
+# Linux Mint (and derivatives) are Ubuntu-based: use Ubuntu repos + the
+# underlying UBUNTU_CODENAME for apt/tailscale, not Mint's own codename.
+if [ "${OS_ID:-}" = "linuxmint" ]; then
+  OS_ID="ubuntu"
+  # shellcheck disable=SC1091
+  OS_CODENAME="$(. /etc/os-release 2>/dev/null; echo "${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}")"
+  export OS_ID OS_CODENAME
+fi
+
+usage() {
+  cat <<'EOF'
+Caravan node onboarding
+
+Usage: sudo bash node-join.sh --hub URL --token KEY [options]
+
+  --hub URL            Headscale URL of the hub (e.g. https://mesh.example.com)
+  --token KEY          Headscale preauth key (hskey-auth-...)
+  --name NAME          node name in the mesh (default: hostname)
+  --user USER          user that owns the workspace (default: sudo user)
+  --workspace-root P   directory CodeNomad may browse (default: user's home)
+  --port N             HTTP port (default: 9898 codenomad / 4096 opencode)
+  --engine NAME        node engine: codenomad (default) or opencode (web UI)
+  --dry-run            print the plan (engine/port/user) and exit
+  --bypass-vpn         route hub/mesh traffic directly when the node full-tunnels
+  --hub-ip IP          hub public IP (auto-resolved from --hub when needed)
+  --stt                install local speech-to-text (speaches) with the model
+                       recommended for this machine; on capable machines it is
+                       also offered interactively after the join
+  --stt-check          print the STT recommendation for this machine and exit
+  --stt-model NAME     use an explicit Whisper model (implies --stt)
+  --stt-gpu            force the CUDA image (implies --stt)
+  --stt-cpu            force the CPU image (implies --stt)
+  --stt-image IMG      explicit speaches image (implies --stt)
+  --uninstall          remove Caravan node services (keeps files/packages)
+  --purge              with --uninstall: also remove tailscale + STT container
+EOF
+}
+
+NODE_PORT=""
+METRICS_PORT=9101
+ENGINE="codenomad"
+DRY_RUN=0
+WITH_STT=0
+STT_MODEL=""
+STT_IMAGE=""
+STT_GPU=0
+STT_CPU=0
+STT_CHECK=0
+BYPASS_VPN=0
+UNINSTALL=0
+PURGE=0
+WORKSPACE_ROOT=""
+NODE_NAME=""
+RUN_USER=""
+HEADSCALE_URL=""
+PREAUTH_KEY=""
+HUB_IP=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --hub) HEADSCALE_URL="${2:?--hub needs a value}"; shift 2 ;;
+    --token) PREAUTH_KEY="${2:?--token needs a value}"; shift 2 ;;
+    --name) NODE_NAME="${2:?--name needs a value}"; shift 2 ;;
+    --user) RUN_USER="${2:?--user needs a value}"; shift 2 ;;
+    --workspace-root) WORKSPACE_ROOT="${2:?--workspace-root needs a value}"; shift 2 ;;
+    --port) NODE_PORT="${2:?--port needs a value}"; shift 2 ;;
+    --engine) ENGINE="${2:?--engine needs a value}"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --hub-ip) HUB_IP="${2:?--hub-ip needs a value}"; shift 2 ;;
+    --bypass-vpn) BYPASS_VPN=1; shift ;;
+    --stt) WITH_STT=1; shift ;;
+    --stt-check) STT_CHECK=1; shift ;;
+    --stt-model) WITH_STT=1; STT_MODEL="${2:?--stt-model needs a value}"; shift 2 ;;
+    --stt-gpu) WITH_STT=1; STT_GPU=1; shift ;;
+    --stt-cpu) WITH_STT=1; STT_CPU=1; shift ;;
+    --stt-image) WITH_STT=1; STT_IMAGE="${2:?--stt-image needs a value}"; shift 2 ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    --purge) PURGE=1; shift ;;
+    -h | --help) usage; exit 0 ;;
+    *) die "unknown argument: $1 (try --help)" ;;
+  esac
+done
+
+require_root
+detect_os
+case "$OS_ID" in
+  ubuntu | debian | linuxmint) : ;;
+  *) die "unsupported OS: ${OS_ID:-unknown} (Ubuntu/Debian expected)" ;;
+esac
+
+if [ "$UNINSTALL" = 0 ] && [ "$STT_CHECK" = 0 ]; then
+  NODE_NAME="${NODE_NAME:-$(hostname)}"
+  RUN_USER="${RUN_USER:-${SUDO_USER:-root}}"
+  [ -n "$HEADSCALE_URL" ] || die "--hub is required"
+  [ -n "$PREAUTH_KEY" ] || die "--token is required"
+  log "$NODE_NAME -> $HEADSCALE_URL as user $RUN_USER (engine=$ENGINE)"
+fi
+
+case "$ENGINE" in
+  codenomad | opencode) : ;;
+  *) die "unknown engine: $ENGINE (codenomad | opencode)" ;;
+esac
+if [ -z "$NODE_PORT" ]; then
+  if [ "$ENGINE" = opencode ]; then NODE_PORT=4096; else NODE_PORT=9898; fi
+fi
+
+ensure_base_deps() {
+  have curl && return 0
+  log "installing base deps (curl, ca-certificates)"
+  apt-get update -qq || warn "apt-get update reported errors; continuing"
+  apt-get install -y -qq curl ca-certificates >/dev/null
+}
+
+install_node() {
+  local major=0
+  if have node; then
+    major="$(node --version 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/')"
+  fi
+  # need npm too: a distro nodejs package can ship without it, and Node < 20 is
+  # too old for the engines — reinstall via NodeSource in either case.
+  if have node && have npm && [ "${major:-0}" -ge 20 ]; then
+    log "node already present ($(node --version))"
+    return 0
+  fi
+  log "installing Node.js 22 (NodeSource)"
+  retry bash -c 'curl -fsSL https://deb.nodesource.com/setup_22.x | bash -'
+  apt-get install -y -qq nodejs >/dev/null
+  have npm || apt-get install -y -qq npm >/dev/null 2>&1 || true
+}
+
+install_engine() {
+  # Pin a COMPATIBLE PAIR, never "latest to latest": CodeNomad requires an exact
+  # opencode version — its dependency `@opencode/client@<v>` — and opencode v2
+  # ships as `@opencode/cli` (the old `opencode-ai` is the 1.x line). Install the
+  # matching `@opencode/cli@<v>`.
+  local codenomad_v="${CODENOMAD_VERSION:-0.20.1}"
+  local opencode_v="${OPENCODE_VERSION:-2.0.22}"
+  if [ "$ENGINE" = opencode ]; then
+    have opencode && { log "opencode $(opencode --version 2>/dev/null | head -1) present"; return 0; }
+    log "installing @opencode/cli@$opencode_v"
+    npm install -g "@opencode/cli@$opencode_v" >/dev/null
+  else
+    have codenomad && { log "codenomad $(codenomad --version 2>/dev/null | head -1) present"; return 0; }
+    log "installing @neuralnomads/codenomad@$codenomad_v + @opencode/cli@$opencode_v"
+    npm install -g "@neuralnomads/codenomad@$codenomad_v" "@opencode/cli@$opencode_v" >/dev/null
+  fi
+  # a custom Node prefix may live off-PATH (e.g. /opt/node-*): expose the bins
+  local pfx; pfx="$(npm prefix -g 2>/dev/null)"
+  for b in opencode codenomad; do
+    [ -x "$pfx/bin/$b" ] && ln -sf "$pfx/bin/$b" "/usr/bin/$b" 2>/dev/null || true
+  done
+}
+
+install_engine_update() {
+  # Pull the engine pair the hub wants (mesh-only /engine.json) and apply it.
+  # Nothing happens unless the hub has a desired pair (mode off/notify w/o a click).
+  mkdir -p /opt/caravan-node
+  cat > /opt/caravan-node/engine-update.sh <<'SH'
+#!/bin/bash
+want=$(curl -fsS --max-time 8 "http://100.64.0.1:8090/engine.json" 2>/dev/null) || exit 0
+read_json() { printf '%s' "$want" | /usr/bin/python3 -c "import json,sys;print(json.load(sys.stdin).get('$1',''))" 2>/dev/null; }
+roll=$(read_json roll); cn=$(read_json codenomad); oc=$(read_json opencode)
+[ "$roll" = "True" ] && [ -n "$cn" ] || exit 0
+[ "$(codenomad --version 2>/dev/null | head -1)" = "$cn" ] && exit 0
+npm install -g "@neuralnomads/codenomad@$cn" "@opencode/cli@$oc" >/dev/null 2>&1
+systemctl restart codenomad
+SH
+  chmod 755 /opt/caravan-node/engine-update.sh
+  cat > /etc/systemd/system/caravan-engine-update.service <<'UNIT'
+[Unit]
+Description=Caravan engine auto-update (pull the desired pair from the hub)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/caravan-node/engine-update.sh
+UNIT
+  cat > /etc/systemd/system/caravan-engine-update.timer <<'UNIT'
+[Unit]
+Description=Caravan engine auto-update timer
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now caravan-engine-update.timer
+}
+
+install_tailscale() {
+  have tailscale && return 0
+  log "installing tailscale (apt repo)"
+  local codename="${OS_CODENAME:-}"
+  [ -n "$codename" ] || die "cannot detect distro codename (OS_CODENAME)"
+  retry curl -fsSL "https://pkgs.tailscale.com/stable/${OS_ID}/${codename}.noarmor.gpg" \
+    -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+  retry curl -fsSL "https://pkgs.tailscale.com/stable/${OS_ID}/${codename}.tailscale-keyring.list" \
+    -o /etc/apt/sources.list.d/tailscale.list
+  apt-get update -qq || warn "apt-get update reported errors; continuing"
+  apt-get install -y -qq tailscale >/dev/null
+}
+
+install_hub_ca() {
+  local host="${HEADSCALE_URL#*://}"
+  host="${host%%/*}"
+  # Real (ACME) TLS: the cert is trusted, nothing to do. Self-signed hub: trust
+  # the CA the hub serves at /ca.crt so tailscale can reach the control server.
+  if curl -fsS --max-time 8 "https://${host}/health" >/dev/null 2>&1; then
+    return 0
+  fi
+  log "hub certificate is not trusted — fetching the hub CA (self-signed mode)"
+  mkdir -p /usr/local/share/ca-certificates
+  if curl -fsS -k --max-time 8 "https://${host}/ca.crt" \
+    -o /usr/local/share/ca-certificates/caravan-hub.crt 2>/dev/null; then
+    update-ca-certificates >/dev/null 2>&1 || true
+    # tailscaled caches the system root pool at start — restart it so it picks
+    # up the freshly trusted CA before we try to log in.
+    systemctl restart tailscaled 2>/dev/null || true
+    log "installed the hub CA"
+  else
+    warn "could not fetch https://${host}/ca.crt — tailscale may fail on a self-signed hub"
+  fi
+}
+
+join_mesh() {
+  install_tailscale
+  install_hub_ca
+  # A machine may already be on *another* tailnet (e.g. the public one). Joining
+  # the hub means switching, so compare the control URL — not just "is tailscale up".
+  local cur=""
+  if tailscale status >/dev/null 2>&1; then
+    cur="$(tailscale debug prefs 2>/dev/null | python3 -c 'import json,sys
+try: print((json.load(sys.stdin) or {}).get("ControlURL",""))
+except Exception: print("")' 2>/dev/null || true)"
+  fi
+  if [ "${cur%/}" = "${HEADSCALE_URL%/}" ]; then
+    log "already joined to the mesh"
+  else
+    if [ -n "$cur" ]; then
+      log "already on another tailnet ($cur) — switching to $HEADSCALE_URL"
+      tailscale logout 2>/dev/null || true
+    else
+      log "joining mesh as $NODE_NAME"
+    fi
+    tailscale up --login-server="$HEADSCALE_URL" --authkey="$PREAUTH_KEY" \
+      --hostname="$NODE_NAME" --accept-dns=false
+  fi
+  sleep 4
+}
+
+write_unit() {
+  local node_bin workspace wsroot
+  node_bin="$(npm prefix -g)/bin"
+  workspace="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+  [ -n "$workspace" ] || workspace="/root"
+  mkdir -p "$workspace"
+  wsroot="${WORKSPACE_ROOT:-$workspace}"
+  mkdir -p "$wsroot"
+  local desc doc execline workdir
+  if [ "$ENGINE" = opencode ]; then
+    desc="Caravan node (opencode web)"
+    doc="https://opencode.ai/docs/web/"
+    execline="$node_bin/opencode web --port $NODE_PORT --hostname 0.0.0.0"
+    workdir="$wsroot"
+  else
+    desc="Caravan node (CodeNomad)"
+    doc="https://github.com/NeuralNomadsAI/CodeNomad"
+    execline="$node_bin/codenomad --https=false --http=true --host 0.0.0.0 --http-port $NODE_PORT --dangerously-skip-auth --workspace-root $wsroot"
+    workdir="$workspace"
+  fi
+  log "writing systemd unit (engine=$ENGINE user=$RUN_USER port=$NODE_PORT ws=$wsroot)"
+  cat > /etc/systemd/system/codenomad.service <<UNIT
+[Unit]
+Description=$desc
+Documentation=$doc
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$RUN_USER
+Group=$RUN_USER
+Environment=HOME=$workspace
+Environment=PATH=$node_bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NODE_OPTIONS=--max-old-space-size=8192
+WorkingDirectory=$workdir
+ExecStart=$execline
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=codenomad
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now codenomad
+}
+
+install_metrics() {
+  local dir="/opt/caravan-node"
+  mkdir -p "$dir"
+  cp -f "$HERE/metrics.py" "$dir/metrics.py"
+  local mesh_ip
+  mesh_ip="$(tailscale ip -4 2>/dev/null | head -n1)"
+  [ -n "$mesh_ip" ] || mesh_ip="0.0.0.0"
+  cat > /etc/systemd/system/caravan-metrics.service <<UNIT
+[Unit]
+Description=Caravan node metrics (mesh-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=METRICS_HOST=$mesh_ip
+Environment=METRICS_PORT=$METRICS_PORT
+ExecStart=/usr/bin/python3 $dir/metrics.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now caravan-metrics.service
+  log "metrics on http://$mesh_ip:$METRICS_PORT/metrics"
+}
+
+setup_vpn_bypass() {
+  local gw iface host
+  [ -n "$HUB_IP" ] || {
+    host="${HEADSCALE_URL#*://}"
+    host="${host%%/*}"
+    HUB_IP="$(getent hosts "$host" | awk '{print $1; exit}')"
+  }
+  [ -n "$HUB_IP" ] || die "--bypass-vpn: cannot resolve hub IP (pass --hub-ip)"
+  gw="$(ip route show default 2>/dev/null | awk '/default/{print $3; exit}')"
+  iface="$(ip route show default 2>/dev/null | awk '/default/{print $5; exit}')"
+  [ -n "$gw" ] && [ -n "$iface" ] || {
+    warn "--bypass-vpn: no default route found; skipping"
+    return 0
+  }
+  # Script that keeps hub-direct + mesh traffic out of the VPN. The VPN's ip
+  # rule block drifts between builds (98/99, 88/89, 78/79, 68/69, 48/49, ...),
+  # so we place ours right below whatever it installed and clean old rules by
+  # destination. Run at boot (the unit) and on every tunnel up (the PostUp).
+  cat > /usr/local/sbin/caravan-mesh-route.sh <<SCRIPT
+#!/bin/bash
+HUB=${HUB_IP}
+while ip rule show | grep -q "to 100.64.0.0/10 lookup 52"; do ip rule del to 100.64.0.0/10 lookup 52 2>/dev/null || break; done
+while ip rule show | grep -q "to \$HUB lookup main"; do ip rule del to \$HUB lookup main 2>/dev/null || break; done
+LOW=\$(ip rule show | awk -F: '/suppress_prefixlength|51820|0xca6c/{gsub(/ /,"",\$1);print \$1}' | sort -n | head -1)
+P=40; [ -n "\$LOW" ] && [ "\$LOW" -gt 4 ] && P=\$((LOW-2))
+GW=\$(ip route show default | awk '{print \$3; exit}')
+IF=\$(ip route show default | awk '{print \$5; exit}')
+ip rule add pref "\$P" to "\$HUB/32" lookup main
+ip route replace "\$HUB/32" via "\$GW" dev "\$IF" table main
+ip rule add pref "\$((P+1))" to 100.64.0.0/10 lookup 52
+SCRIPT
+  chmod 755 /usr/local/sbin/caravan-mesh-route.sh
+
+  cat > /etc/systemd/system/codenomad-mesh-route.service <<UNIT
+[Unit]
+Description=Route CodeNomad hub traffic directly (bypass VPN tunnel) for the mesh
+After=network-online.target
+Wants=network-online.target
+Before=tailscaled.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/caravan-mesh-route.sh
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now codenomad-mesh-route.service
+
+  local awg_conf="/etc/amnezia/amneziawg/awg0.conf"
+  if [ -f "$awg_conf" ] && have python3; then
+    cp "$awg_conf" "$awg_conf.bak.$(date +%Y%m%d-%H%M%S)"
+    python3 - "$awg_conf" <<'PY'
+import sys
+p = sys.argv[1]
+out = []; added = False; skip = False
+for ln in open(p).read().splitlines():
+    if ln.startswith('# codenomad-mesh bypass'):
+        skip = True; continue
+    if skip and (ln.startswith('PostUp') or ln.startswith('PreDown')):
+        continue
+    skip = False
+    out.append(ln)
+    if ln.strip() == '[Interface]' and not added:
+        out.append('PostUp = /usr/local/sbin/caravan-mesh-route.sh'); added = True
+open(p, 'w').write('\n'.join(out) + '\n')
+print('postup inserted' if added else 'no [Interface] section')
+PY
+    systemctl restart awg-quick@awg0.service 2>/dev/null || true
+  fi
+  log "VPN bypass: hub $HUB_IP routed via $gw ($iface)"
+  systemctl restart tailscaled
+  sleep 8
+}
+
+detect_resources() {
+  RAM_MB="$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo)"
+  CORES="$(nproc)"
+  DISK_FREE_GB="$(df -Pk / | awk 'NR==2{print int($4/1024/1024)}')"
+  GPU=""
+  if have nvidia-smi; then GPU="$(nvidia-smi -L 2>/dev/null | head -n1)"; fi
+}
+
+# Sets REC_MODEL, REC_IMAGE, REC_VERDICT from the machine's resources.
+stt_recommend() {
+  detect_resources
+  local cpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cpu"
+  local gpu_img="ghcr.io/speaches-ai/speaches:0.8.3-cuda"
+  REC_SAFE=0
+  # speaches wants the full HuggingFace id (a bare "medium" 404s); CPU-only caps
+  # at medium since large-v3 is impractically slow without a GPU.
+  local hf="Systran/faster-whisper"
+  if [ -n "$GPU" ]; then
+    REC_MODEL="$hf-large-v3"; REC_IMAGE="$gpu_img"; REC_VERDICT="strongly recommended (GPU)"; REC_SAFE=1
+  elif [ "$RAM_MB" -ge 16000 ]; then
+    REC_MODEL="$hf-medium"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
+  elif [ "$RAM_MB" -ge 8000 ]; then
+    REC_MODEL="$hf-small"; REC_IMAGE="$cpu_img"; REC_VERDICT="recommended (CPU)"; REC_SAFE=1
+  elif [ "$RAM_MB" -ge 4000 ]; then
+    REC_MODEL="$hf-base"; REC_IMAGE="$cpu_img"; REC_VERDICT="tight for this machine"
+  else
+    REC_MODEL="$hf-tiny"; REC_IMAGE="$cpu_img"; REC_VERDICT="not enough RAM"
+  fi
+}
+
+stt_report() {
+  log "STT resources: RAM=$((RAM_MB / 1024))GB cores=$CORES disk=${DISK_FREE_GB}GB free gpu=${GPU:-none}"
+  log "STT recommendation: model=$REC_MODEL image=${REC_IMAGE##*:} -> $REC_VERDICT"
+}
+
+stt_underpowered() {
+  [ "$RAM_MB" -lt 4000 ] && [ -z "$GPU" ]
+}
+
+wire_codenomad() {
+  local model="$1" port="$2" home cfg
+  home="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+  [ -n "$home" ] || home="/root"
+  cfg="$home/.config/codenomad/config.yaml"
+  if have python3 && python3 -c 'import yaml' >/dev/null 2>&1; then
+    mkdir -p "$(dirname "$cfg")"
+    CFG="$cfg" MODEL="$model" PORT="$port" python3 - <<'PY'
+import os
+
+import yaml
+
+cfg = os.environ["CFG"]
+data = {}
+if os.path.exists(cfg):
+    with open(cfg, encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+data.setdefault("server", {})["speech"] = {
+    "baseUrl": f"http://127.0.0.1:{os.environ['PORT']}/v1",
+    "apiKey": "local",
+    "sttModel": os.environ["MODEL"],
+}
+with open(cfg, "w", encoding="utf-8") as fh:
+    yaml.safe_dump(data, fh, sort_keys=False)
+print(f"[caravan] wrote CodeNomad speech config: {cfg}")
+PY
+    chown "$RUN_USER":"$RUN_USER" "$cfg" 2>/dev/null || true
+    systemctl restart codenomad 2>/dev/null || true
+  else
+    warn "python3+yaml missing — add this to CodeNomad config manually:"
+    echo "  server.speech: { baseUrl: http://127.0.0.1:$port/v1, apiKey: \"local\", sttModel: $model }"
+  fi
+}
+
+setup_stt() {
+  stt_recommend
+  stt_report
+  local model image
+  model="${STT_MODEL:-$REC_MODEL}"
+  image="${STT_IMAGE:-$REC_IMAGE}"
+  [ "$STT_CPU" = 1 ] && image="ghcr.io/speaches-ai/speaches:0.8.3-cpu"
+  [ "$STT_GPU" = 1 ] && image="ghcr.io/speaches-ai/speaches:0.8.3-cuda"
+  if [ -z "$STT_MODEL" ] && stt_underpowered; then
+    printf '\033[1;31m[caravan] WARNING: this machine (RAM %sGB, no GPU) is tight for STT — continuing at your OWN RISK.\033[0m\n' \
+      "$((RAM_MB / 1024))" >&2
+  fi
+  if [ -n "$STT_MODEL" ] && [ "$model" != "$REC_MODEL" ]; then
+    log "STT: using explicitly requested model=$model (recommendation was $REC_MODEL)"
+  fi
+  if ! have docker; then
+    log "installing Docker (for STT)"
+    retry bash -c 'curl -fsSL https://get.docker.com | sh'
+  fi
+  log "STT: starting speaches (image=${image##*:})"
+  docker rm -f codenomad-stt >/dev/null 2>&1 || true
+  docker run -d --name codenomad-stt --restart unless-stopped \
+    -p 127.0.0.1:8000:8000 "$image" >/dev/null
+  log "STT: downloading model $model (first run can take a while)"
+  # trigger the download (the request may block while downloading — that is fine)
+  curl -s -o /dev/null --max-time 900 -X POST "http://127.0.0.1:8000/v1/models/$model" || true
+  local ok=0
+  for _ in $(seq 1 60); do
+    if curl -s --max-time 6 "http://127.0.0.1:8000/v1/models" 2>/dev/null | grep -q "$model"; then
+      ok=1
+      break
+    fi
+    sleep 6
+  done
+  if [ "$ok" != 1 ]; then
+    printf '\033[1;31m[caravan] STT FAILED: model "%s" never appeared in speaches — voice will NOT work. Check the model id / network, then re-run with --stt.\033[0m\n' \
+      "$model" >&2
+    return 0
+  fi
+  log "STT: model ready ($model)"
+  wire_codenomad "$model" 8000
+  log "STT ready on http://127.0.0.1:8000"
+}
+
+maybe_offer_stt() {
+  # Offer voice-to-text: honest about resources, and the choice is always the
+  # user's. Non-interactive runs (no TTY / CARAVAN_YES=1) only get a hint.
+  stt_recommend
+  local ram=$((RAM_MB / 1024))
+  if [ -r /dev/tty ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
+    if [ "$REC_SAFE" = 1 ]; then
+      printf '[caravan] this machine (RAM %sGB%s) can run local speech-to-text.\n' \
+        "$ram" "${GPU:+, GPU}" >&2
+      printf '[caravan] install voice-to-text? (Docker + model %s, a few GB) [y/N] ' "$REC_MODEL" >&2
+    else
+      printf '\033[1;31m[caravan] WARNING: this machine (RAM %sGB%s) is tight for speech-to-text.\n' \
+        "$ram" "${GPU:+, GPU}" >&2
+      printf '[caravan] it competes for RAM/CPU and can slow your work — install at your OWN RISK.\n' >&2
+      printf '[caravan] suggested model: %s (%s). install anyway? [y/N]\033[0m ' "$REC_MODEL" "$REC_VERDICT" >&2
+    fi
+    local ans=""
+    read -r ans < /dev/tty || ans=""
+    case "$ans" in y | Y | yes | YES) setup_stt ;; *) log "skipping voice-to-text" ;; esac
+  else
+    [ "$REC_SAFE" = 1 ] &&
+      log "voice-to-text is available on this machine — re-run with --stt to install ($REC_MODEL)"
+  fi
+}
+
+remove_awg_bypass() {
+  local awg="/etc/amnezia/amneziawg/awg0.conf"
+  [ -f "$awg" ] || return 0
+  grep -q 'codenomad-mesh bypass' "$awg" || return 0
+  cp "$awg" "$awg.bak.$(date +%Y%m%d-%H%M%S)"
+  sed -i '/# codenomad-mesh bypass/,+2d' "$awg"
+  systemctl restart awg-quick@awg0.service 2>/dev/null || true
+  log "removed VPN-bypass block from $awg"
+}
+
+uninstall() {
+  log "uninstalling Caravan node services (files and packages are kept)"
+  if have tailscale && tailscale status >/dev/null 2>&1; then
+    # logout (not just down) so a later re-join is not skipped as "already joined"
+    tailscale logout 2>/dev/null || tailscale down 2>/dev/null || true
+    log "left the mesh"
+  fi
+  systemctl disable --now codenomad 2>/dev/null || true
+  rm -f /etc/systemd/system/codenomad.service
+  systemctl disable --now caravan-metrics.service 2>/dev/null || true
+  rm -f /etc/systemd/system/caravan-metrics.service
+  systemctl disable --now codenomad-mesh-route.service 2>/dev/null || true
+  rm -f /etc/systemd/system/codenomad-mesh-route.service
+  systemctl daemon-reload
+  remove_awg_bypass
+  if [ "$PURGE" = 1 ]; then
+    log "purging tailscale package + STT container"
+    docker rm -f codenomad-stt >/dev/null 2>&1 || true
+    apt-get purge -y tailscale >/dev/null 2>&1 || true
+  fi
+  log "done — workspace and user files untouched"
+}
+
+warn_early_stage() {
+  printf '\n\033[1;33m%s\033[0m\n' "WARNING: Caravan is early-stage (pre-1.0) software — use at your own risk."
+  cat <<'EOF'
+  * Join a FRESH / throwaway machine (VM, LXC, or a spare box) —
+    NOT one with critical data or production workloads.
+  * Back up first. This installs Node.js + tailscale, joins a mesh, and
+    writes a systemd unit for CodeNomad.
+  * MIT licence: provided "as is", without warranty of any kind.
+EOF
+  if [ -t 0 ] && [ "${CARAVAN_YES:-0}" != "1" ]; then
+    printf 'Continue? [y/N] '
+    read -r ans
+    case "$ans" in y | Y | yes | YES) : ;; *) die "aborted by user" ;; esac
+  fi
+}
+
+check_tun() {
+  # Tailscale needs a TUN device. Unprivileged Proxmox LXC containers have no
+  # /dev/net/tun by default and tailscaled then fails cryptically *after* a long
+  # install — fail fast with actionable guidance instead.
+  [ -e /dev/net/tun ] && return 0
+  cat >&2 <<'EOF'
+
+[caravan] /dev/net/tun is missing — Tailscale cannot start, so this machine
+          cannot join the mesh. In an unprivileged Proxmox LXC this is the
+          default. Fix one of these and re-run:
+
+  A) On the Proxmox host, allow TUN for the container:
+       pct set <VMID> -features nesting=1
+     If that is not enough, add to /etc/pve/lxc/<VMID>.conf:
+       lxc.cgroup2.devices.allow: c 10:200 rwm
+       lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+     then: pct reboot <VMID>      (verify inside: ls -l /dev/net/tun)
+
+  B) Use a VM instead of a container — TUN works out of the box.
+EOF
+  die "cannot join the mesh without /dev/net/tun"
+}
+
+check_not_hub() {
+  # Onboarding the hub itself is almost always a mistake (it is already on the
+  # mesh) — stop with a clear message instead of confusing partial results.
+  [ "${CARAVAN_ALLOW_HUB_NODE:-0}" = 1 ] && return 0
+  if [ -f /opt/caravan/caravan.env ] && have docker &&
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -qx headscale; then
+    die "this machine is the Caravan HUB (headscale runs here) — run node-join on the NEW machine, not the hub"
+  fi
+}
+
+main() {
+  if [ "$UNINSTALL" = 1 ]; then
+    uninstall
+    return 0
+  fi
+  if [ "$STT_CHECK" = 1 ]; then
+    stt_recommend
+    stt_report
+    return 0
+  fi
+  warn_early_stage
+  if [ "$DRY_RUN" = 1 ]; then
+    log "dry-run: engine=$ENGINE name=$NODE_NAME port=$NODE_PORT user=$RUN_USER ws=${WORKSPACE_ROOT:-<home>}"
+    return 0
+  fi
+  check_tun
+  check_not_hub
+  ensure_base_deps
+  install_node
+  install_engine
+  join_mesh
+  write_unit
+  install_metrics
+  install_engine_update
+  [ "$BYPASS_VPN" = 1 ] && setup_vpn_bypass
+  if [ "$WITH_STT" = 1 ]; then setup_stt; else maybe_offer_stt; fi
+  local ip
+  ip="$(tailscale ip -4 | head -n1)"
+  log "DONE. $NODE_NAME mesh-ip=$ip port=$NODE_PORT"
+  echo
+  echo "Register on the hub (run there):"
+  echo "  bash tools/add-node.sh --name $NODE_NAME --ip $ip --port $NODE_PORT"
+  echo "or via the portal UI: https://hub.<DOMAIN>  (+ Add)"
+}
+
+main "$@"
