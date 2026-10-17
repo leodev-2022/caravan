@@ -1,0 +1,36 @@
+# Headscale config template — rendered by install.sh into headscale/config.yaml.
+# The server_url domain is substituted from caravan.env.
+log:
+  level: info
+  format: text
+
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9090
+grpc_listen_addr: 0.0.0.0:50443
+
+server_url: https://mesh.__DOMAIN__
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+
+derp:
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+  auto_update_enabled: true
+  automatic_derp_connection_reporting: true
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+
+dns:
+  magic_dns: false
+  override_local_dns: false
+
+policy:
+  mode: database
